@@ -41,10 +41,13 @@ def apply_mutation(in_ta: str, out_ta: str, op: str):
     in_tree = parser.parse(open(in_ta).read())
 
     # mutating AST
-    if(op == "remove_transition"):
-        out_tree = operators.remove_transition(in_tree)
-    else:
-        raise ValueError("Unknown mutation operator.")
+    match op:
+        case "no_op":
+            out_tree = operators.no_op(in_tree)
+        case "remove_transition":
+            out_tree = operators.remove_transition(in_tree)
+        case _:
+            raise ValueError("Unknown mutation operator.")
     
     # reconstructing TA text file from mutated AST
     reconstructor = lark.reconstruct.Reconstructor(parser)
@@ -73,7 +76,7 @@ if "__main__" == __name__:
         type = str,
         required = True,
         help = "Mutation operator to be used.",
-        choices = ["remove_transition"]
+        choices = ["no_op", "remove_transition"]
     )
 
     args = parser.parse_args()
