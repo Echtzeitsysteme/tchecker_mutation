@@ -1,45 +1,102 @@
-system: system_definition definition+
+start: system_declaration NEWLINE (declaration NEWLINE)+
 
-// definitions
-definition: process_definition
-          | event_definition
-          | clock_definition
-          | int_definition
-          | location_definition
-          | edge_definition
-          | sync_definition
+// declarations
+declaration: process_declaration
+          | event_declaration
+          | clock_declaration
+          | int_declaration
+          | location_declaration
+          | edge_declaration
+          | sync_declaration
 
-system_definition: "system" ":" id [attributes]
+system_declaration: "system" ":" id attributes?
 
-process_definition: "process" ":" id [attributes]
+process_declaration: "process" ":" id attributes?
 
-event_definition: "event" ":" id [attributes]
+event_declaration: "event" ":" id attributes?
 
-clock_definition: "clock" ":" INT ":" id [attributes]
+clock_declaration: "clock" ":" INT ":" id attributes?
 
-int_definition: "int" ":" INT ":" INT ":" INT ":" INT ":" id [attributes]
+int_declaration: "int" ":" INT ":" SIGNED_INT ":" SIGNED_INT ":" SIGNED_INT ":" id attributes?
 
-location_definition: "location" ":" id ":" id [attributes]
+location_declaration: "location" ":" id ":" id attributes?
 
-edge_definition: "edge" ":" id ":" id ":" id [attributes]
+edge_declaration: "edge" ":" id ":" id ":" id ":" id attributes?
 
-sync_definition: "sync" ":" sync_constraints [attributes]
+sync_declaration: "sync" ":" sync_constraints attributes?
 
-sync_constraints: sync_constraint (":" sync_constraint)*
+sync_constraints: sync_constraint (":" sync_constraint)+
 
-sync_constraint: id "@" id ["?"]
+sync_constraint: id "@" id question_mark?
+question_mark: "?"
 
-attributes: "(" [attribute (":" attribute)*] ")"
+attributes: "{" (attribute (":" attribute)*)? "}"
 
-attribute: "initial" ":"
-         | "labels" ":" id ("," id)*
-         | "invariant" ":" clock_constraint
-         | "committed" ":"
-         | "urgent" ":"
-         | "provided" ":" clock_constraint
-         | "do" ":" stmt
-         | "layout" ":" SIGNED_INT "," SIGNED_INT
+attribute: initial_attribute
+         | labels_attribute
+         | invariant_attribute
+         | committed_attribute
+         | urgent_attribute
+         | provided_attribute
+         | do_attribute
+         | id ":" ESCAPED_STRING // ?
+        //  | "layout" ":" SIGNED_INT "," SIGNED_INT
 
+initial_attribute: "initial" ":"
+labels_attribute: "labels" ":" id ("," id)*
+invariant_attribute: "invariant" ":" expr
+committed_attribute: "committed" ":"
+urgent_attribute: "urgent" ":"
+provided_attribute: "provided" ":" expr
+do_attribute: "do" ":" stmt
+
+// expressions
+expr: "(" atomic_expr ("&&" atomic_expr)* ")"
+    | atomic_expr ("&&" atomic_expr)*
+
+atomic_expr: "(" atomic_expr ")"
+           | "!" atomic_expr
+           | predicate_expr
+           | clock_expr
+        //    | int_term
+
+predicate_expr: int_term "!=" int_term
+              | int_term cmp int_term
+              | int_term less_cmp int_term less_cmp int_term
+
+int_id: id ("[" int_term "]")?
+
+int_term: "(" int_term ")"
+        | SIGNED_INT
+        | "-" int_term
+        | int_term op int_term 
+        | int_id // ?
+
+op: op_add | op_sub | op_mult | op_div | op_mod
+
+op_add: "+"
+op_sub: "-"
+op_mult: "*"
+op_div: "/"
+op_mod: "%"
+
+// clock expressions
+clock_expr: clock_term cmp int_term
+          | int_term cmp clock_term
+          | int_term less_cmp clock_term less_cmp int_term
+
+clock_term: clock_id (op_sub clock_id)?
+
+clock_id: id ("[" int_term "]")?
+
+cmp: cmp_eq | cmp_geq | cmp_gt | less_cmp
+less_cmp: cmp_leq | cmp_lt
+
+cmp_eq: "=="
+cmp_geq: ">="
+cmp_gt: ">"
+cmp_leq: "<="
+cmp_lt: "<"
 
 // statements
 stmt: statement (";" statement)*
@@ -51,62 +108,32 @@ statement: simple_statement
 simple_statement: int_assignment
                 | clock_assignment
                 | local_statement
-                | "nop"
+                | nop
 
-if_statement: "if" expr "then" stmt ["else" stmt] "end"
+nop: "nop"
+
+if_statement: "if" expr "then" stmt ("else" stmt)? "end"
 
 while_statement: "while" expr "do" stmt "end"
 
-int_assignment: lvalue_int "=" int_term
+int_assignment: int_id "=" int_term
 
-clock_assignment: lvalue_clock "=" int_term ["+" lvalue_clock]
+clock_assignment: clock_id "=" int_term (op_add clock_id)? // auch andersrum?
 
-local_statement: "local" id 
-               | "local" id "=" term
-               | "local" id "[" term "]"
+local_statement: "local" id ("[" int_term "]")?
+               | "local" id "=" int_term
 
-// expressions
-expr: atomic_expr ("&&" expr)*
+id: /[a-zA-Z_$]([a-zA-Z0-9_.])*/ // $?
 
-atomic_expr: int_term
-           | predicate_expr
-           | "!" atomic_expr
-           | clock_expr
-
-predicate_expr: "(" predicate_expr ")"
-              | int_term "!=" int_term
-              | int_term cmp int_term
-              | int_term less_cmp int_term less_cmp int_term
-
-int_term: SIGNED_INT
-        | lvalue_int
-        | "-" int_term
-        | int_term op int_term
-
-lvalue_int: id ["[" term "]"]
-
-op: "+" | "-" | "*" | "/" | "%"
-
-// clock constraints
-clock_constraint: 
-
-clock_expr: clock_term cmp int_term
-          | int_term cmp clock_term
-          | int_term less_cmp clock_term less_cmp int_term
-
-clock_term: lvalue_clock ["-" lvalue_clock]
-
-lvalue_clock: id ["[" int_term "]"]
-
-cmp: "==" | ">=" | ">" | less_cmp
-less_cmp: "<" | "<="
-
-id: ("_" | LETTER) ("_" | "." | LETTER | DIGIT)*
+COMMENT: "#" /[^\n]*/ NEWLINE
 
 %import common.SIGNED_INT
 %import common.INT
 %import common.LETTER
 %import common.DIGIT
-%import common.WS
+%import common.ESCAPED_STRING
+%import common.WS_INLINE
+%import common.NEWLINE
 
-%ignore WS
+%ignore WS_INLINE
+%ignore COMMENT
