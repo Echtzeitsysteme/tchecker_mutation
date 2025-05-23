@@ -1,5 +1,7 @@
 import argparse
 import random
+import lark
+import lark.reconstruct
 
 import operators
 
@@ -32,10 +34,21 @@ def apply_mutation(in_ta: str, out_ta: str, operator: str):
     :param out_ta: Path to .txt or .tck file for the mutated TA.
     :param operator: Mutation operator to be used.
     """ 
+
+    # parsing input TA text file to AST
+    parser = lark.Lark.open("parsing/grammar.lark")
+    in_tree = parser.parse(open(in_ta).read())
+
+    # mutating AST
     if(operator == "remove_transition"):
-        operators.remove_transition(in_ta, out_ta)
+        out_tree = operators.remove_transition(in_tree)
     else:
         raise ValueError("Unknown mutation operator.")
+    
+    # reconstructing TA text file from mutated AST
+    reconstructor = lark.reconstruct.Reconstructor(parser)
+    out_ta_str = reconstructor.reconstruct(out_tree)
+    open(out_ta).write(out_ta_str)
 
 if "__main__" == __name__:
 
@@ -66,7 +79,7 @@ if "__main__" == __name__:
     in_ta = args.input_ta
     out_ta = args.output_file
 
-    # check for syntax errors
+    # check for syntax errors in input TA file
     if(not check_syntax(in_ta)):
         raise SyntaxError("Input TA has invalid syntax.")
     
@@ -75,3 +88,8 @@ if "__main__" == __name__:
         apply_mutation(in_ta, out_ta, args.operator)
         if(not check_bisimilarity(in_ta, out_ta)):
             break
+
+    # check for syntax errors in output TA file
+    if(not check_syntax(out_ta)):
+        raise SyntaxError("Computed mutation has invalid syntax.")
+    
