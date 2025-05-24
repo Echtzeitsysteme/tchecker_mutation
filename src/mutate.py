@@ -20,39 +20,46 @@ def check_bisimilarity(first: str, second: str) -> bool:
     Checks whether given TA are bisimilar.
     Not implemented yet.
 
-    :param first: .txt or .tck file of first TA.
-    :param second: .txt or .tck file of secon TA.
-    :return: True iff given TA are bisimilar.
+    :param first: .txt or .tck file of first TA
+    :param second: .txt or .tck file of secon TA
+    :return: true iff given TA are bisimilar
     """ 
     return random.choice([True, False])
 
-def apply_mutation(in_ta: str, out_ta: str, op: str):
+def apply_mutation(in_ta: str, out_ta: str, op: str) -> None:
     """
     Applies mutation operator to given TA.
 
-    :param in_ta: .txt or .tck file of TA to be mutated.
-    :param out_ta: Path to .txt or .tck file for the mutated TA.
-    :param op: Mutation operator to be used.
+    :param in_ta: .txt or .tck file of TA to be mutated
+    :param out_ta: path to .txt or .tck file for the mutated TA
+    :param op: mutation operator to be used
     """ 
 
     # parsing input TA text file to AST
     parser = lark.Lark.open("parsing/grammar.lark", __file__)
     parser.options.maybe_placeholders = False
-    in_tree = parser.parse(open(in_ta).read())
+    ta_tree = parser.parse(open(in_ta).read())
+
+    # print tree for debugging
+    # print(ta_tree.pretty())
 
     # mutating AST
     match op:
         case "no_op":
-            out_tree = operators.no_op(in_tree)
+            # for testing purposes
+            pass
         case "remove_transition":
-            out_tree = operators.remove_transition(in_tree)
+            ta_tree = operators.Remove_Transition(ta_tree).transform(ta_tree)
         case _:
             raise ValueError("Unknown mutation operator.")
-    
+        
+    # print tree for debugging
+    # print(ta_tree.pretty())
+
     # reconstructing TA text file from mutated AST
     reconstructor = lark.reconstruct.Reconstructor(parser)
-    out_ta_str = reconstructor.reconstruct(out_tree)
-    open(out_ta, "wt").write(out_ta_str)
+    out_ta_str = reconstructor.reconstruct(ta_tree)
+    open(out_ta, "wt+").write(out_ta_str)
 
 if "__main__" == __name__:
 
@@ -83,17 +90,15 @@ if "__main__" == __name__:
     in_ta = args.in_ta
     out_ta = args.out_ta
 
-    # check for syntax errors in input TA file
-    if(not check_syntax(in_ta)):
-        raise SyntaxError("Input TA has invalid syntax.")
-    
+    # assert that input TA file does not contain syntax errors
+    assert(check_syntax(in_ta))
+
     # compute new mutation if current one is bisimilar to input TA
     while(True):
         apply_mutation(in_ta, out_ta, args.op)
         if(not check_bisimilarity(in_ta, out_ta)):
             break
 
-    # check for syntax errors in output TA file
-    if(not check_syntax(out_ta)):
-        raise SyntaxError("Computed mutation has invalid syntax.")
+    # assert that output TA file does not contain syntax errors
+    assert(check_syntax(out_ta))
     

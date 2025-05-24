@@ -1,7 +1,9 @@
-start: NEWLINE* system_declaration NEWLINE (declaration NEWLINE)+
+// minimal tree shaping to avoid interfering with reconstruction (this might be optimizable)
+
+start: NEWLINE* system_declaration _declaration+
 
 // declarations
-declaration: process_declaration
+_declaration: process_declaration
           | event_declaration
           | clock_declaration
           | int_declaration
@@ -9,28 +11,28 @@ declaration: process_declaration
           | edge_declaration
           | sync_declaration
 
-system_declaration: SYSTEM_TOK COLON_TOK id attributes?
+system_declaration: SYSTEM_TOK COLON_TOK id attributes? NEWLINE
 SYSTEM_TOK: "system"
 
-process_declaration: PROCESS_TOK COLON_TOK id attributes?
+process_declaration: PROCESS_TOK COLON_TOK id attributes? NEWLINE
 PROCESS_TOK: "process"
 
-event_declaration: EVENT_TOK COLON_TOK id attributes?
+event_declaration: EVENT_TOK COLON_TOK id attributes? NEWLINE
 EVENT_TOK: "event"
 
-clock_declaration: CLOCK_TOK COLON_TOK INT COLON_TOK id attributes?
+clock_declaration: CLOCK_TOK COLON_TOK INT COLON_TOK id attributes? NEWLINE
 CLOCK_TOK: "clock"
 
-int_declaration: INT_TOK COLON_TOK INT COLON_TOK SIGNED_INT COLON_TOK SIGNED_INT COLON_TOK SIGNED_INT COLON_TOK id attributes?
+int_declaration: INT_TOK COLON_TOK INT COLON_TOK SIGNED_INT COLON_TOK SIGNED_INT COLON_TOK SIGNED_INT COLON_TOK id attributes? NEWLINE
 INT_TOK: "int"
 
-location_declaration: LOCATION_TOK COLON_TOK id COLON_TOK id attributes?
+location_declaration: LOCATION_TOK COLON_TOK id COLON_TOK id attributes? NEWLINE
 LOCATION_TOK: "location"
 
-edge_declaration: EDGE_TOK COLON_TOK id COLON_TOK id COLON_TOK id COLON_TOK id attributes?
+edge_declaration: EDGE_TOK COLON_TOK id COLON_TOK id COLON_TOK id COLON_TOK id attributes? NEWLINE
 EDGE_TOK: "edge"
 
-sync_declaration: SYNC_TOK COLON_TOK sync_constraints attributes?
+sync_declaration: SYNC_TOK COLON_TOK sync_constraints attributes? NEWLINE
 SYNC_TOK: "sync"
 
 sync_constraints: sync_constraint (COLON_TOK sync_constraint)+
@@ -39,17 +41,18 @@ sync_constraint: id AT_TOK id QUESTION_MARK_TOK?
 AT_TOK: "@"
 QUESTION_MARK_TOK: "?"
 
-attributes: LEFT_BRACE_TOK (attribute (COLON_TOK attribute)*)? RIGHT_BRACE_TOK
+attributes: LEFT_BRACE_TOK (_attribute (COLON_TOK _attribute)*)? RIGHT_BRACE_TOK
 
-attribute: initial_attribute
+_attribute: initial_attribute
          | labels_attribute
          | invariant_attribute
          | committed_attribute
          | urgent_attribute
          | provided_attribute
          | do_attribute
-         | id COLON_TOK ESCAPED_STRING // ?
+         | custom_attribute
         //  | "layout" COLON_TOK SIGNED_INT "," SIGNED_INT
+custom_attribute: id COLON_TOK ESCAPED_STRING // ?
 
 initial_attribute: INITIAL_TOK COLON_TOK
 INITIAL_TOK: "initial"
@@ -122,18 +125,18 @@ CMP_LEQ_TOK: "<="
 CMP_LT_TOK: "<"
 
 // statements
-stmt: statement (SEMICOLON_TOK statement)*
+stmt: _statement (SEMICOLON_TOK _statement)*
 SEMICOLON_TOK: ";"
 
-statement: simple_statement
+_statement: _simple_statement
          | if_statement
          | while_statement
 
-simple_statement: int_assignment
+_simple_statement: int_assignment
                 | clock_assignment
                 | local_statement
-                | NOP_TOK
-
+                | nop
+nop: NOP_TOK
 NOP_TOK: "nop"
 
 if_statement: IF_TOK expr THEN_TOK stmt (ELSE_TOK stmt)? END_TOK
