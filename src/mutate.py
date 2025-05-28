@@ -24,21 +24,16 @@ def check_bisimilarity(first: str, second: str) -> bool:
     :param second: .txt or .tck file of secon TA
     :return: true iff given TA are bisimilar
     """ 
+    return False
     return random.choice([True, False])
 
-def apply_mutation(in_ta: str, out_ta: str, op: str) -> None:
+def apply_mutation(ta_tree: lark.ParseTree, op: str) -> lark.ParseTree:
     """
     Applies mutation operator to given TA.
 
-    :param in_ta: .txt or .tck file of TA to be mutated
-    :param out_ta: path to .txt or .tck file for the mutated TA
+    :param ta_tree: AST of TA to be mutated
     :param op: mutation operator to be used
     """ 
-
-    # parsing input TA text file to AST
-    parser = lark.Lark.open("parsing/grammar.lark", __file__)
-    parser.options.maybe_placeholders = False
-    ta_tree = parser.parse(open(in_ta).read())
 
     # print tree for debugging
     # print(ta_tree.pretty())
@@ -47,19 +42,16 @@ def apply_mutation(in_ta: str, out_ta: str, op: str) -> None:
     match op:
         case "no_op":
             # for testing purposes
-            pass
+            return operators.no_op(ta_tree)
+        case "change_guard_cmp":
+            return operators.change_guard_cmp(ta_tree)
         case "remove_transition":
-            ta_tree = operators.Remove_Transition(ta_tree).transform(ta_tree)
+            return operators.remove_transition(ta_tree)
         case _:
             raise ValueError("Unknown mutation operator.")
         
     # print tree for debugging
     # print(ta_tree.pretty())
-
-    # reconstructing TA text file from mutated AST
-    reconstructor = lark.reconstruct.Reconstructor(parser)
-    out_ta_str = reconstructor.reconstruct(ta_tree)
-    open(out_ta, "wt+").write(out_ta_str)
 
 if "__main__" == __name__:
 
@@ -83,7 +75,7 @@ if "__main__" == __name__:
         type = str,
         required = True,
         help = "Mutation operator to be used.",
-        choices = ["no_op", "remove_transition"]
+        choices = ["no_op", "change_guard_cmp", "remove_transition"]
     )
 
     args = parser.parse_args()
@@ -93,9 +85,20 @@ if "__main__" == __name__:
     # assert that input TA file does not contain syntax errors
     assert(check_syntax(in_ta))
 
+    # parsing input TA text file to AST
+    parser = lark.Lark.open("parsing/grammar.lark", __file__)
+    parser.options.maybe_placeholders = False
+    in_ta_tree = parser.parse(open(in_ta).read())
+
     # compute new mutation if current one is bisimilar to input TA
     while(True):
-        apply_mutation(in_ta, out_ta, args.op)
+        out_ta_tree = apply_mutation(in_ta_tree, args.op)
+
+        # reconstructing TA text file from mutated AST
+        reconstructor = lark.reconstruct.Reconstructor(parser)
+        out_ta_str = reconstructor.reconstruct(out_ta_tree)
+        open(out_ta, "wt+").write(out_ta_str)
+
         if(not check_bisimilarity(in_ta, out_ta)):
             break
 
