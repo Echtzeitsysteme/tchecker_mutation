@@ -1,6 +1,6 @@
 // minimal tree shaping to avoid interfering with reconstruction (this might be optimizable)
 
-start: NEWLINE* system_declaration (NEWLINE_TOK+ _declaration)+ NEWLINE*
+start: NEWLINE* system_declaration (NEWLINE_TOK+ _declaration)+ (NEWLINE_TOK | NEWLINE)*
 
 // declarations
 _declaration: process_declaration

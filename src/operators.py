@@ -31,7 +31,7 @@ def change_guard_cmp(tree: ParseTree) -> ParseTree:
     is_clock_expr = False
     id_nodes_in_atomic_expr = list(atomic_expr_to_be_altered.find_data("id"))
     for clock_declaration in tree.find_data("clock_declaration"):
-        if(as_tree(clock_declaration).children[4] in id_nodes_in_atomic_expr):
+        if(clock_declaration.children[4] in id_nodes_in_atomic_expr):
             is_clock_expr = True
     
     # cmp definitions
@@ -93,9 +93,43 @@ def change_guard_cmp(tree: ParseTree) -> ParseTree:
     altered_guard = exchange_node(guard_to_be_altered, atomic_expr_to_be_altered, altered_atomic_expr)
     
     # change guard node
-    return exchange_node(tree, guard_to_be_altered, altered_guard)
+    return exchange_node(tree.copy(), guard_to_be_altered, altered_guard)
  
 # structure changing operators
+
+def remove_location(tree: ParseTree) -> ParseTree:
+    """
+    Removes one randomly chosen location from the given TA.
+
+    :param tree: AST of TA to be mutated
+    :return: mutated TA AST
+    """
+
+    # choose location to be removed
+    suitable_locations = list(tree.find_data("location_declaration"))
+    initial_attribute = next(tree.find_data("initial_attribute"))
+
+    for location in suitable_locations:
+        if contains_child_node(location, initial_attribute):
+            suitable_locations.remove(location)
+
+    location_to_be_removed = random.choice(suitable_locations)
+    process_id = location_to_be_removed.children[2]
+    location_id = location_to_be_removed.children[4]
+
+    # find all transitions going into or out of chosen location
+    edges_to_be_removed = []
+    for edge in list(tree.find_data("edge_declaration")):
+        if(edge.children[2] == process_id and (edge.children[4] == location_id or edge.children[6] == location_id)):
+            edges_to_be_removed.append(edge)
+
+    # remove location and transitions belonging to it
+    result = tree.copy()
+    remove_node(result, location_to_be_removed)
+    for edge in edges_to_be_removed:
+        remove_node(result, edge)
+
+    return result
 
 def remove_transition(tree: ParseTree) -> ParseTree:
     """
@@ -104,8 +138,9 @@ def remove_transition(tree: ParseTree) -> ParseTree:
     :param tree: AST of TA to be mutated
     :return: mutated TA AST
     """
+
     edge_to_be_removed = choose_random_node_of_type(tree, "edge_declaration")
-    return remove_node(tree, edge_to_be_removed)
+    return remove_node(tree.copy(), edge_to_be_removed)
     
 # other operators
 
@@ -150,7 +185,7 @@ def exchange_node_helper(tree: ParseTree, old_node, new_node, occurrence_in_chil
             if(isinstance(child, Token)):
                 new_children.append(child)
             else:
-                new_children.append(exchange_node_helper(as_tree(child), old_node, new_node, occurrence_in_child_list))
+                new_children.append(exchange_node_helper(child, old_node, new_node, occurrence_in_child_list))
 
         tree.set(tree.data, new_children)
     
@@ -194,7 +229,7 @@ def remove_node_helper(tree: ParseTree, node, occurrence_in_child_list) -> Parse
             if(isinstance(child, Token)):
                 new_children.append(child)
             else:
-                new_children.append(remove_node_helper(as_tree(child), node, occurrence_in_child_list))
+                new_children.append(remove_node_helper(child, node, occurrence_in_child_list))
 
         tree.set(tree.data, new_children)
     
@@ -204,6 +239,7 @@ def contains_child_node(tree, node) -> bool:
     """
     Determines whether given tree contains given node.
     """
+
     if(tree == node):
         return True
     
@@ -214,24 +250,17 @@ def contains_child_node(tree, node) -> bool:
     return False
 
 def choose_random_node_of_type(tree: ParseTree, type: str) -> ParseTree:
-    """"
+    """
     Selects and returns a random node of given type in the given tree.
 
     :param tree: tree to be searched
     :param type: type of node to be returned
     :returns: random node of given type in the given tree
     """
+
     options = list(tree.find_data(type))
 
     if(0 == len(options)):
         raise ValueError("Tree does not contain node of given type.")
     
-    return as_tree(random.choice(options))
-
-def as_tree(obj) -> ParseTree:
-    """
-    Casts given object to ParseTree if possible.
-    """
-    if(not isinstance(obj, Tree)):
-        raise TypeError
-    return typing.cast(ParseTree, obj)
+    return random.choice(options)
