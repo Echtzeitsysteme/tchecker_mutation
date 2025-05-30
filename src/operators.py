@@ -22,7 +22,7 @@ def change_guard_cmp(tree: ParseTree) -> ParseTree:
 
     cmps = ["==", "<=", "<", ">=", ">", "!="]
 
-    # find node to be changed
+    # choose node to be changed
     guard_to_be_altered = choose_random_node_of_type(tree, "provided_attribute")
     atomic_expr_to_be_altered = choose_random_node_of_type(guard_to_be_altered, "atomic_expr")
     is_simple_atomic_expr = (1 == sum(1 for _ in atomic_expr_to_be_altered.scan_values(lambda t: t in cmps)))
@@ -49,7 +49,7 @@ def change_guard_cmp(tree: ParseTree) -> ParseTree:
     # atomic expression with one comparator
     if(is_simple_atomic_expr):
 
-        # randomly choose new comparator
+        # choose new comparator
         cmp_options = cmps
         if(is_clock_expr):
             cmp_options.remove("!=")
@@ -68,13 +68,13 @@ def change_guard_cmp(tree: ParseTree) -> ParseTree:
     # atomic expression with two comparators
     else:
 
-        # randomly choose new comparator
+        # choose new comparator
         cmp_options = less_cmps
         cmps_in_expr = atomic_expr_to_be_altered.scan_values(lambda t: t in cmp_options)
         first_cmp = next(cmps_in_expr)
         second_cmp = next(cmps_in_expr)
 
-        # randomly choose whether first or second comparator in expression is changed
+        # choose whether first or second comparator in expression is changed
         change_second_cmp = random.choice([True, False])
         old_cmp = second_cmp if change_second_cmp else first_cmp
         
@@ -96,6 +96,37 @@ def change_guard_cmp(tree: ParseTree) -> ParseTree:
     return exchange_node(tree.copy(), guard_to_be_altered, altered_guard)
  
 # structure changing operators
+
+def change_transition_source_or_target(tree: ParseTree, change_source: bool) -> ParseTree:
+    """
+    Changes the source or target location of one randomly chosen transition in the given TA to a randomly chosen different location in the same process.
+
+    :param tree: AST of TA to be mutated
+    :param change_source: Method changes source location of transition iff True, target location otherwise.
+    :return: mutated TA AST
+    """
+
+    # choose transition to be changed
+    edge_to_be_changed = choose_random_node_of_type(tree, "edge_declaration")
+    process_id = edge_to_be_changed.children[2]
+    source_location_id = edge_to_be_changed.children[4]
+    target_location_id = edge_to_be_changed.children[6]
+    old_location = source_location_id if change_source else target_location_id
+
+    # choose new source or target location
+    new_location_option_ids = []
+    for location in tree.find_data("location_declaration"):
+        if(location.children[2] == process_id):
+            new_location_option_ids.append(location.children[4])
+    new_location_option_ids.remove(old_location)
+        
+    new_location = random.choice(new_location_option_ids)
+
+    # change transition
+    occurrence = 2 if not change_source and source_location_id == target_location_id else 1
+    altered_edge = exchange_node(edge_to_be_changed, old_location, new_location, occurrence)
+
+    return exchange_node(tree.copy(), edge_to_be_changed, altered_edge)
 
 def remove_location(tree: ParseTree) -> ParseTree:
     """
