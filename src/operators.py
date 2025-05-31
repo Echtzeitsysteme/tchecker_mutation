@@ -97,6 +97,45 @@ def change_guard_cmp(tree: ParseTree) -> ParseTree:
  
 # structure changing operators
 
+def add_transition(tree: ParseTree) -> ParseTree:
+    """
+    Adds a transition between two random locations of one randomly chosen process in the given TA.
+
+    :param tree: AST of TA to be mutated
+    :return: mutated TA AST
+    """
+
+    # choose process to be changed
+    process_to_be_changed = choose_random_node_of_type(tree, "process_declaration")
+    process_id = process_to_be_changed.children[2]
+
+    # choose source and target location belonging to chosen process
+    locations = []
+    for location in tree.find_data("location_declaration"):
+        if(location.children[2] == process_id):
+            locations.append(location.children[4]) 
+    source_location = random.choice(locations)
+    target_location = random.choice(locations)
+
+    # choose event
+    event = choose_random_node_of_type(tree, "event_declaration")
+    event_id = event.children[2]
+
+    # define new transition
+    new_edge = Tree(Token('RULE', 'edge_declaration'), 
+                    [Token('EDGE_TOK', 'edge'), Token('COLON_TOK', ':'), 
+                    process_id, Token('COLON_TOK', ':'), 
+                    source_location, Token('COLON_TOK', ':'), 
+                    target_location, Token('COLON_TOK', ':'), 
+                    event_id])
+
+    # add transition    
+    result = tree.copy()
+    result.children.append(Token('NEWLINE_TOK', '\n\n'))
+    result.children.append(new_edge)
+
+    return result
+
 def change_transition_source_or_target(tree: ParseTree, change_source: bool) -> ParseTree:
     """
     Changes the source or target location of one randomly chosen transition in the given TA to a randomly chosen different location in the same process.
