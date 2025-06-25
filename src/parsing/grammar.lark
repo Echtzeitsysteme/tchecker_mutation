@@ -1,5 +1,18 @@
 // minimal tree shaping to avoid interfering with reconstruction (this might be optimizable)
 
+// basic tokens
+id: /[a-zA-Z_$]([a-zA-Z0-9_.])*/
+
+COLON_TOK: ":"
+LEFT_BRACE_TOK: "{"
+RIGHT_BRACE_TOK: "}"
+LEFT_BRACKET_TOK: "["
+RIGHT_BRACKET_TOK: "]"
+LEFT_PARANTHESES_TOK: "("
+RIGHT_PARANTHESES_TOK: ")"
+ASSIGNMENT_TOK: "="
+NEWLINE_TOK: NEWLINE
+
 start: NEWLINE* system_declaration (NEWLINE_TOK+ _declaration)+ (NEWLINE_TOK | NEWLINE)*
 
 // declarations
@@ -85,7 +98,7 @@ atomic_expr: LEFT_PARANTHESES_TOK atomic_expr RIGHT_PARANTHESES_TOK
            | LOGICAL_NOT_TOK atomic_expr
            | predicate_expr
            | clock_expr
-        //    | int_term
+           | int_term
 LOGICAL_NOT_TOK: "!"
 
 predicate_expr: int_term _cmp int_term
@@ -97,7 +110,7 @@ int_term: LEFT_PARANTHESES_TOK int_term RIGHT_PARANTHESES_TOK
         | SIGNED_INT
         | OP_SUB_TOK int_term
         | int_term op int_term 
-        | int_id // ?
+        | int_id 
 
 op: OP_ADD_TOK | OP_SUB_TOK | OP_MULT_TOK | OP_DIV_TOK | OP_MOD_TOK
 OP_ADD_TOK: "+"
@@ -150,31 +163,16 @@ WHILE_TOK: "while"
 
 int_assignment: int_id ASSIGNMENT_TOK int_term
 
-clock_assignment: clock_id ASSIGNMENT_TOK int_term (OP_ADD_TOK clock_id)? // auch andersrum? 
+clock_assignment: clock_id ASSIGNMENT_TOK int_term (OP_ADD_TOK clock_id)?
 
 local_statement: LOCAL_TOK id (LEFT_BRACKET_TOK int_term RIGHT_BRACKET_TOK)?
                | LOCAL_TOK id ASSIGNMENT_TOK int_term
 LOCAL_TOK: "local"
 
-// basic tokens
-id: /[a-zA-Z_$]([a-zA-Z0-9_.])*/
-
-COLON_TOK: ":"
-LEFT_BRACE_TOK: "{"
-RIGHT_BRACE_TOK: "}"
-LEFT_BRACKET_TOK: "["
-RIGHT_BRACKET_TOK: "]"
-LEFT_PARANTHESES_TOK: "("
-RIGHT_PARANTHESES_TOK: ")"
-ASSIGNMENT_TOK: "="
-NEWLINE_TOK: NEWLINE
-
 COMMENT: "#" /[^\n]*/ NEWLINE
 
 %import common.SIGNED_INT
 %import common.INT
-%import common.LETTER
-%import common.DIGIT
 %import common.ESCAPED_STRING
 %import common.WS_INLINE
 %import common.NEWLINE

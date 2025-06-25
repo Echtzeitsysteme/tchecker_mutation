@@ -1,12 +1,11 @@
-import lark
 import random
-import typing
+import transformers
 
 from lark import ParseTree, Tree, Token
 
 def no_op(tree: ParseTree) -> ParseTree:
     """
-    For testung purposes.
+    For testing purposes.
     """
     return tree
 
@@ -20,22 +19,22 @@ def change_guard_cmp(tree: ParseTree) -> ParseTree:
     :return: mutated TA AST
     """
 
-    cmps = ["==", "<=", "<", ">=", ">", "!="]
+    transformed_tree = transformers.SimplifyExpressions().transform(tree.__deepcopy__(None))
 
     # choose node to be changed
-    guard_to_be_altered = choose_random_node_of_type(tree, "provided_attribute")
+    guard_to_be_altered = choose_random_node_of_type(transformed_tree, "provided_attribute")
+    edge_to_be_altered = random.choice(list(transformed_tree.find_pred(lambda t: contains_child_node(t, guard_to_be_altered))))
     atomic_expr_to_be_altered = choose_random_node_of_type(guard_to_be_altered, "atomic_expr")
-    is_simple_atomic_expr = (1 == sum(1 for _ in atomic_expr_to_be_altered.scan_values(lambda t: t in cmps)))
 
     # check whether chosen atomic expression is a clock or int expression
     is_clock_expr = False
     id_nodes_in_atomic_expr = list(atomic_expr_to_be_altered.find_data("id"))
-    for clock_declaration in tree.find_data("clock_declaration"):
+    for clock_declaration in transformed_tree.find_data("clock_declaration"):
         if(clock_declaration.children[4] in id_nodes_in_atomic_expr):
             is_clock_expr = True
     
     # cmp definitions
-    less_cmps = ["<=", "<"]
+    cmps = ["==", "<=", "<", ">=", ">", "!="]
     cmp_token_names = {
                 "!=": "CMP_NEQ_TOK",
                 "==": "CMP_EQ_TOK",
@@ -46,68 +45,46 @@ def change_guard_cmp(tree: ParseTree) -> ParseTree:
                 }
     
     # change subtree of guard
-    # atomic expression with one comparator
-    if(is_simple_atomic_expr):
+    # choose new comparator
+    cmp_options = cmps
+    if(is_clock_expr):
+        cmp_options.remove("!=")
 
-        # choose new comparator
-        cmp_options = cmps
-        if(is_clock_expr):
-            cmp_options.remove("!=")
+    old_cmp = next(atomic_expr_to_be_altered.scan_values(lambda t: t in cmp_options))
+    cmp_options.remove(old_cmp)
+    new_cmp = random.choice(cmp_options)
 
-        old_cmp = next(atomic_expr_to_be_altered.scan_values(lambda t: t in cmp_options))
-        cmp_options.remove(old_cmp)
-        new_cmp = random.choice(cmp_options)
+    # define old and new comparator node
+    old_cmp_node = Token(cmp_token_names[old_cmp], old_cmp)
+    new_cmp_node = Token(cmp_token_names[new_cmp], new_cmp)
 
-        # define old and new comparator node
-        old_cmp_node = Token(cmp_token_names[old_cmp], old_cmp)
-        new_cmp_node = Token(cmp_token_names[new_cmp], new_cmp)
-
-        # change comparator node
-        altered_atomic_expr = exchange_node(atomic_expr_to_be_altered, old_cmp_node, new_cmp_node)
-        
-    # atomic expression with two comparators
-    else:
-
-        # choose new comparator
-        cmp_options = less_cmps
-        cmps_in_expr = atomic_expr_to_be_altered.scan_values(lambda t: t in cmp_options)
-        first_cmp = next(cmps_in_expr)
-        second_cmp = next(cmps_in_expr)
-
-        # choose whether first or second comparator in expression is changed
-        change_second_cmp = random.choice([True, False])
-        old_cmp = second_cmp if change_second_cmp else first_cmp
-        
-        cmp_options.remove(old_cmp)
-        new_cmp = cmp_options[0]
-
-        # define old and new comparator node
-        old_cmp_node = Token(cmp_token_names[old_cmp], old_cmp)
-        new_cmp_node = Token(cmp_token_names[new_cmp], new_cmp)
-
-        # change comparator node
-        cmp_occurrence = 2 if change_second_cmp and first_cmp == second_cmp else 1
-        altered_atomic_expr = exchange_node(atomic_expr_to_be_altered, old_cmp_node, new_cmp_node, cmp_occurrence)
+    # change comparator node
+    altered_atomic_expr = exchange_node(atomic_expr_to_be_altered, old_cmp_node, new_cmp_node)
 
     # change atomic expression node
     altered_guard = exchange_node(guard_to_be_altered, atomic_expr_to_be_altered, altered_atomic_expr)
+
+    altered_edge = exchange_node(edge_to_be_altered, guard_to_be_altered, altered_guard)
     
     # change guard node
-    return exchange_node(tree.copy(), guard_to_be_altered, altered_guard)
+    return exchange_node(transformed_tree, edge_to_be_altered, altered_edge)
  
 # structure changing operators
 
 def add_transition(tree: ParseTree) -> ParseTree:
     """
-    Adds a transition between two random locations of one randomly chosen process in the given TA.
+    Clones the first declared transition of the given TA and exchanges its source and target location to two random locations in the same randomly chosen process.
 
     :param tree: AST of TA to be mutated
     :return: mutated TA AST
     """
 
-    # choose process to be changed
-    process_to_be_changed = choose_random_node_of_type(tree, "process_declaration")
-    process_id = process_to_be_changed.children[2]
+    # find transition to be cloned
+    new_edge = next(tree.find_data("edge_declaration")).__deepcopy__(None)
+
+    # choose process for new transition
+    process_to_add_edge_to = choose_random_node_of_type(tree, "process_declaration")
+    process_id = process_to_add_edge_to.children[2]
 
     # choose source and target location belonging to chosen process
     locations = []
@@ -117,20 +94,13 @@ def add_transition(tree: ParseTree) -> ParseTree:
     source_location = random.choice(locations)
     target_location = random.choice(locations)
 
-    # choose event
-    event = choose_random_node_of_type(tree, "event_declaration")
-    event_id = event.children[2]
-
-    # define new transition
-    new_edge = Tree(Token('RULE', 'edge_declaration'), 
-                    [Token('EDGE_TOK', 'edge'), Token('COLON_TOK', ':'), 
-                    process_id, Token('COLON_TOK', ':'), 
-                    source_location, Token('COLON_TOK', ':'), 
-                    target_location, Token('COLON_TOK', ':'), 
-                    event_id])
+    # exchange source and target location
+    new_edge.children[2] = process_id
+    new_edge.children[4] = source_location
+    new_edge.children[6] = target_location
 
     # add transition    
-    result = tree.copy()
+    result = tree.__deepcopy__(None)
     result.children.append(Token('NEWLINE_TOK', '\n\n'))
     result.children.append(new_edge)
 
@@ -165,7 +135,7 @@ def change_transition_source_or_target(tree: ParseTree, change_source: bool) -> 
     occurrence = 2 if not change_source and source_location_id == target_location_id else 1
     altered_edge = exchange_node(edge_to_be_changed, old_location, new_location, occurrence)
 
-    return exchange_node(tree.copy(), edge_to_be_changed, altered_edge)
+    return exchange_node(tree.__deepcopy__(None), edge_to_be_changed, altered_edge)
 
 def remove_location(tree: ParseTree) -> ParseTree:
     """
@@ -194,7 +164,7 @@ def remove_location(tree: ParseTree) -> ParseTree:
             edges_to_be_removed.append(edge)
 
     # remove location and transitions belonging to it
-    result = tree.copy()
+    result = tree.__deepcopy__(None)
     remove_node(result, location_to_be_removed)
     for edge in edges_to_be_removed:
         remove_node(result, edge)
@@ -210,7 +180,7 @@ def remove_transition(tree: ParseTree) -> ParseTree:
     """
 
     edge_to_be_removed = choose_random_node_of_type(tree, "edge_declaration")
-    return remove_node(tree.copy(), edge_to_be_removed)
+    return remove_node(tree.__deepcopy__(None), edge_to_be_removed)
     
 # other operators
 
@@ -233,33 +203,32 @@ def exchange_node(tree: ParseTree, old_node, new_node, occurrence_in_child_list:
     if(not contains_child_node(tree, old_node)):
         raise ValueError("Tree does not contain node to be exchanged.")
     
-    return exchange_node_helper(tree.copy(), old_node, new_node, occurrence_in_child_list)
-
-def exchange_node_helper(tree: ParseTree, old_node, new_node, occurrence_in_child_list) -> ParseTree:
+    def exchange_node_helper(tree: ParseTree, old_node, new_node, occurrence_in_child_list) -> ParseTree:
     
-    # old_node is direct child node of tree
-    if(occurrence_in_child_list <= tree.children.count(old_node)):
-        occurrences_so_far = 0
+        # old_node is direct child node of tree
+        if(occurrence_in_child_list <= tree.children.count(old_node)):
+            occurrences_so_far = 0
+            for i in range(len(tree.children)):
+                if(tree.children[i] == old_node):
+                    occurrences_so_far += 1
+                    if(occurrences_so_far == occurrence_in_child_list):
+                        tree.children[i] = new_node
 
-        for i in range(len(tree.children)):
-            if(tree.children[i] == old_node):
-                occurrences_so_far += 1
-                if(occurrences_so_far == occurrence_in_child_list):
-                    tree.children[i] = new_node
-    
-    # given node is no direct child node of tree
-    else:
-        new_children = []
+        # given node is no direct child node of tree
+        else:
+            new_children = []
 
-        for child in tree.children:
-            if(isinstance(child, Token)):
-                new_children.append(child)
-            else:
-                new_children.append(exchange_node_helper(child, old_node, new_node, occurrence_in_child_list))
+            for child in tree.children:
+                if(isinstance(child, Token)):
+                    new_children.append(child)
+                else:
+                    new_children.append(exchange_node_helper(child, old_node, new_node, occurrence_in_child_list))
 
-        tree.set(tree.data, new_children)
-    
-    return tree
+            tree.set(tree.data, new_children)
+
+        return tree
+
+    return exchange_node_helper(tree.__deepcopy__(None), old_node, new_node, occurrence_in_child_list)
 
 def remove_node(tree: ParseTree, node, occurrence_in_child_list: int = 1) -> ParseTree:
     """
@@ -275,35 +244,35 @@ def remove_node(tree: ParseTree, node, occurrence_in_child_list: int = 1) -> Par
     if(not contains_child_node(tree, node)):
         raise ValueError("Tree does not contain node to be removed.")
     
-    return remove_node_helper(tree.copy(), node, occurrence_in_child_list)
+    def remove_node_helper(tree: ParseTree, node, occurrence_in_child_list) -> ParseTree:
 
-def remove_node_helper(tree: ParseTree, node, occurrence_in_child_list) -> ParseTree:
+        # given node is direct child node of tree
+        if(occurrence_in_child_list <= tree.children.count(node)):
+            occurrences_so_far = 0
 
-    # given node is direct child node of tree
-    if(occurrence_in_child_list <= tree.children.count(node)):
-        occurrences_so_far = 0
+            for i in range(len(tree.children)):
+                if(tree.children[i] == node):
+                    occurrences_so_far += 1
+                    if(occurrences_so_far == occurrence_in_child_list):
+                        idx = i
 
-        for i in range(len(tree.children)):
-            if(tree.children[i] == node):
-                occurrences_so_far += 1
-                if(occurrences_so_far == occurrence_in_child_list):
-                    idx = i
+            tree.children.pop(idx)
+        
+        # given node is no direct child node of tree
+        else:
+            new_children = []
 
-        tree.children.pop(idx)
-    
-    # given node is no direct child node of tree
-    else:
-        new_children = []
+            for child in tree.children:
+                if(isinstance(child, Token)):
+                    new_children.append(child)
+                else:
+                    new_children.append(remove_node_helper(child, node, occurrence_in_child_list))
 
-        for child in tree.children:
-            if(isinstance(child, Token)):
-                new_children.append(child)
-            else:
-                new_children.append(remove_node_helper(child, node, occurrence_in_child_list))
+            tree.set(tree.data, new_children)
+        
+        return tree
 
-        tree.set(tree.data, new_children)
-    
-    return tree
+    return remove_node_helper(tree.__deepcopy__(None), node, occurrence_in_child_list)
 
 def contains_child_node(tree, node) -> bool:
     """
