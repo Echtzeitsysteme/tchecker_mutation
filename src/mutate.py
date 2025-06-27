@@ -1,42 +1,20 @@
 import argparse
-import random
+import os.path
 import lark
 import lark.reconstruct
 
+import helpers
 import operators
+import transformers
 
-def check_syntax(ta: str) -> bool:
-    """
-    Checks whether given TA has correct TChecker syntax.
-    Not implemented yet.
-
-    :param ta: .txt or .tck file of TA.
-    :return: True iff given file has valid syntax.
-    """ 
-    return True
-
-def check_bisimilarity(first: str, second: str) -> bool:
-    """
-    Checks whether given TA are bisimilar.
-    Not implemented yet.
-
-    :param first: .txt or .tck file of first TA
-    :param second: .txt or .tck file of secon TA
-    :return: true iff given TA are bisimilar
-    """ 
-    return False
-    return random.choice([True, False])
-
-def apply_mutation(ta_tree: lark.ParseTree, op: str) -> lark.ParseTree:
+def apply_mutation(ta_tree: lark.ParseTree, op: str) -> list[lark.ParseTree]:
     """
     Applies mutation operator to given TA.
 
     :param ta_tree: AST of TA to be mutated
     :param op: mutation operator to be used
+    :return: list of mutations
     """ 
-
-    # print tree for debugging
-    # print(ta_tree.pretty())
 
     # mutating AST
     match op:
@@ -57,9 +35,6 @@ def apply_mutation(ta_tree: lark.ParseTree, op: str) -> lark.ParseTree:
             return operators.remove_transition(ta_tree)
         case _:
             raise ValueError("Unknown mutation operator.")
-        
-    # print tree for debugging
-    # print(ta_tree.pretty())
 
 if "__main__" == __name__:
 
@@ -73,10 +48,10 @@ if "__main__" == __name__:
         help = "Timed automaton to be mutated. Must be .txt or .tck file in valid TChecker syntax."
     )
     parser.add_argument(
-        "--out_ta",
+        "--out_dir",
         type = str,
         required = True,
-        help = "Path to output .txt file for mutated TA."
+        help = "Path to output directory for mutated TA files."
     )
     parser.add_argument(
         "--op",
@@ -88,28 +63,40 @@ if "__main__" == __name__:
 
     args = parser.parse_args()
     in_ta = args.in_ta
-    out_ta = args.out_ta
+    out_dir = args.out_dir
+    op = args.op
+
+    os.makedirs(out_dir, exist_ok=True)
 
     # assert that input TA file does not contain syntax errors
-    assert(check_syntax(in_ta))
+    assert(helpers.check_syntax(in_ta))
 
     # parsing input TA text file to AST
     parser = lark.Lark.open("parsing/grammar.lark", __file__)
     parser.options.maybe_placeholders = False
     in_ta_tree = parser.parse(open(in_ta).read())
 
-    # compute new mutation if current one is bisimilar to input TA
-    while(True):
-        out_ta_tree = apply_mutation(in_ta_tree, args.op)
+    # simplifying complex expressions in AST
+    in_ta_tree = transformers.SimplifyExpressions().transform(in_ta_tree)
+
+    # compute mutations
+    mutations = apply_mutation(in_ta_tree.__deepcopy__(None), op)
+
+    for i in range(len(mutations)):
+
+        out_file = os.path.join(out_dir, f"{in_ta[:-4]}_mutation_{op}_{i}.tck")
 
         # reconstructing TA text file from mutated AST
         reconstructor = lark.reconstruct.Reconstructor(parser)
-        out_ta_str = reconstructor.reconstruct(out_ta_tree)
-        open(out_ta, "wt+").write(out_ta_str)
+        out_ta = reconstructor.reconstruct(mutations[i])
+        open(out_file, "wt+").write(out_ta)
 
-        if(not check_bisimilarity(in_ta, out_ta)):
-            break
+        # assert that output TA file does not contain syntax errors
+        assert(helpers.check_syntax(out_file))
 
-    # assert that output TA file does not contain syntax errors
-    assert(check_syntax(out_ta))
+        # delete mutation if it is bisimilar to original
+        if(helpers.check_bisimilarity(in_ta, out_file)):
+            os.remove(out_file)
+
+        
     

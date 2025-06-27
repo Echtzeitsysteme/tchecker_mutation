@@ -1,38 +1,26 @@
-import random
-import transformers
+import helpers
 
-from lark import ParseTree, Tree, Token
+from lark import ParseTree, Token
 
-def no_op(tree: ParseTree) -> ParseTree:
+def no_op(tree: ParseTree) -> list[ParseTree]:
     """
     For testing purposes.
     """
-    return tree
+    return [tree]
 
 # constraint changing operators
 
-def change_guard_cmp(tree: ParseTree) -> ParseTree:
+def change_guard_cmp(tree: ParseTree) -> list[ParseTree]:
     """
     Changes one comparator in a randomly chosen guard from the given TA.
+    Computes a list of mutations of the given TA such that for each mutation one comparator in one guard is changed.
 
     :param tree: AST of TA to be mutated
-    :return: mutated TA AST
+    :return: list of mutated ASTs
     """
 
-    transformed_tree = transformers.SimplifyExpressions().transform(tree.__deepcopy__(None))
+    mutations = []
 
-    # choose node to be changed
-    guard_to_be_altered = choose_random_node_of_type(transformed_tree, "provided_attribute")
-    edge_to_be_altered = random.choice(list(transformed_tree.find_pred(lambda t: contains_child_node(t, guard_to_be_altered))))
-    atomic_expr_to_be_altered = choose_random_node_of_type(guard_to_be_altered, "atomic_expr")
-
-    # check whether chosen atomic expression is a clock or int expression
-    is_clock_expr = False
-    id_nodes_in_atomic_expr = list(atomic_expr_to_be_altered.find_data("id"))
-    for clock_declaration in transformed_tree.find_data("clock_declaration"):
-        if(clock_declaration.children[4] in id_nodes_in_atomic_expr):
-            is_clock_expr = True
-    
     # cmp definitions
     cmps = ["==", "<=", "<", ">=", ">", "!="]
     cmp_token_names = {
@@ -44,262 +32,192 @@ def change_guard_cmp(tree: ParseTree) -> ParseTree:
                 ">": "CMP_GT_TOK"
                 }
     
-    # change subtree of guard
-    # choose new comparator
-    cmp_options = cmps
-    if(is_clock_expr):
-        cmp_options.remove("!=")
+    # find transitions
+    edges = list(tree.find_data("edge_declaration"))
 
-    old_cmp = next(atomic_expr_to_be_altered.scan_values(lambda t: t in cmp_options))
-    cmp_options.remove(old_cmp)
-    new_cmp = random.choice(cmp_options)
+    for edge in edges:
+        # find guards
+        guards = list(edge.find_data("provided_attribute"))
 
-    # define old and new comparator node
-    old_cmp_node = Token(cmp_token_names[old_cmp], old_cmp)
-    new_cmp_node = Token(cmp_token_names[new_cmp], new_cmp)
+        for guard in guards:
+            # find atomic expressions
+            atomic_expressions = list(guard.find_data("atomic_expr"))
 
-    # change comparator node
-    altered_atomic_expr = exchange_node(atomic_expr_to_be_altered, old_cmp_node, new_cmp_node)
+            for expr in atomic_expressions:
+                # skip expression if it does not contain comparator (expression is an int term)
+                if(0 == len(list(expr.find_data("predicate_expr"))) and 0 == len(list(expr.find_data("clock_expr")))):
+                    continue
 
-    # change atomic expression node
-    altered_guard = exchange_node(guard_to_be_altered, atomic_expr_to_be_altered, altered_atomic_expr)
+                # check whether expression is a clock or int expression
+                is_clock_expr = False
+                id_nodes_in_atomic_expr = list(expr.find_data("id"))
+                for clock_declaration in tree.find_data("clock_declaration"):
+                    if(clock_declaration.children[4] in id_nodes_in_atomic_expr):
+                        is_clock_expr = True
 
-    altered_edge = exchange_node(edge_to_be_altered, guard_to_be_altered, altered_guard)
-    
-    # change guard node
-    return exchange_node(transformed_tree, edge_to_be_altered, altered_edge)
- 
+                # if expression is clock expression, new comparator can not be !=
+                cmp_options = cmps.copy()
+                if(is_clock_expr):
+                    cmp_options.remove("!=")
+
+                # new comparator can not be old comparator
+                old_cmp = next(expr.scan_values(lambda t: t in cmp_options))
+                cmp_options.remove(old_cmp)
+
+                # define old comparator node
+                old_cmp_node = Token(cmp_token_names[old_cmp], old_cmp)
+
+                for cmp in cmp_options:
+                    # define new comparator node
+                    new_cmp_node = Token(cmp_token_names[cmp], cmp)
+
+                    # change node
+                    altered_atomic_expr = helpers.exchange_node(expr, old_cmp_node, new_cmp_node)
+                    altered_guard = helpers.exchange_node(guard, expr, altered_atomic_expr)
+                    altered_edge = helpers.exchange_node(edge, guard, altered_guard)
+
+                    mutation = helpers.exchange_node(tree, edge, altered_edge)
+                    mutations.append(mutation)
+                
+    return mutations
+
 # structure changing operators
 
-def add_transition(tree: ParseTree) -> ParseTree:
+def add_transition(tree: ParseTree) -> list[ParseTree]:
     """
-    Clones the first declared transition of the given TA and exchanges its source and target location to two random locations in the same randomly chosen process.
+    Computes a list of mutations of the given TA.
+    For each mutation, the first declared transition of the TA is cloned and its source and target location are changed to two different locations (both in the same process).
 
     :param tree: AST of TA to be mutated
-    :return: mutated TA AST
+    :return: list of mutated ASTs
     """
 
-    # find transition to be cloned
-    new_edge = next(tree.find_data("edge_declaration")).__deepcopy__(None)
+    mutations = []
 
-    # choose process for new transition
-    process_to_add_edge_to = choose_random_node_of_type(tree, "process_declaration")
-    process_id = process_to_add_edge_to.children[2]
+    # find processes
+    processes = list(tree.find_data("process_declaration"))
 
-    # choose source and target location belonging to chosen process
-    locations = []
-    for location in tree.find_data("location_declaration"):
-        if(location.children[2] == process_id):
-            locations.append(location.children[4]) 
-    source_location = random.choice(locations)
-    target_location = random.choice(locations)
+    for process in processes:
 
-    # exchange source and target location
-    new_edge.children[2] = process_id
-    new_edge.children[4] = source_location
-    new_edge.children[6] = target_location
+        process_id = process.children[2]
 
-    # add transition    
-    result = tree.__deepcopy__(None)
-    result.children.append(Token('NEWLINE_TOK', '\n\n'))
-    result.children.append(new_edge)
+        # choose source and target location belonging to chosen process
+        locations = []
+        for location in tree.find_data("location_declaration"):
+            if(location.children[2] == process_id):
+                locations.append(location.children[4]) 
 
-    return result
+        for source_location in locations:
+            for target_location in locations:
 
-def change_transition_source_or_target(tree: ParseTree, change_source: bool) -> ParseTree:
+                # find transition to be cloned (first transition)
+                new_edge = next(tree.find_data("edge_declaration")).__deepcopy__(None)
+                
+                # exchange source and target location
+                new_edge.children[2] = process_id
+                new_edge.children[4] = source_location
+                new_edge.children[6] = target_location
+
+                # add transition    
+                mutation = tree.__deepcopy__(None)
+                mutation.children.append(Token('NEWLINE_TOK', '\n\n'))
+                mutation.children.append(new_edge)
+
+                mutations.append(mutation)
+
+    return mutations
+
+def change_transition_source_or_target(tree: ParseTree, change_source: bool) -> list[ParseTree]:
     """
-    Changes the source or target location of one randomly chosen transition in the given TA to a randomly chosen different location in the same process.
+    Computes a list of mutations of the given TA such that for each mutation the source or target location of one transition is changes to a different location in the same process.
 
     :param tree: AST of TA to be mutated
     :param change_source: Method changes source location of transition iff True, target location otherwise.
-    :return: mutated TA AST
+    :return: list of mutated ASTs
     """
 
-    # choose transition to be changed
-    edge_to_be_changed = choose_random_node_of_type(tree, "edge_declaration")
-    process_id = edge_to_be_changed.children[2]
-    source_location_id = edge_to_be_changed.children[4]
-    target_location_id = edge_to_be_changed.children[6]
-    old_location = source_location_id if change_source else target_location_id
+    mutations = []
 
-    # choose new source or target location
-    new_location_option_ids = []
-    for location in tree.find_data("location_declaration"):
-        if(location.children[2] == process_id):
-            new_location_option_ids.append(location.children[4])
-    new_location_option_ids.remove(old_location)
-        
-    new_location = random.choice(new_location_option_ids)
+    # find transitions
+    edges = list(tree.find_data("edge_declaration"))
 
-    # change transition
-    occurrence = 2 if not change_source and source_location_id == target_location_id else 1
-    altered_edge = exchange_node(edge_to_be_changed, old_location, new_location, occurrence)
+    for edge in edges:
 
-    return exchange_node(tree.__deepcopy__(None), edge_to_be_changed, altered_edge)
+        process_id = edge.children[2]
+        source_location_id = edge.children[4]
+        target_location_id = edge.children[6]
+        old_location = source_location_id if change_source else target_location_id
 
-def remove_location(tree: ParseTree) -> ParseTree:
+        occurrence = 2 if not change_source and source_location_id == target_location_id else 1
+
+        # find new source or target location
+        new_location_options = []
+        for location in tree.find_data("location_declaration"):
+            if(location.children[2] == process_id):
+                new_location_options.append(location.children[4])
+        new_location_options.remove(old_location)
+            
+        for location in new_location_options:
+            # change transition
+            altered_edge = helpers.exchange_node(edge, old_location, location, occurrence)
+            mutations.append(helpers.exchange_node(tree, edge, altered_edge))
+
+    return mutations
+
+def remove_location(tree: ParseTree) -> list[ParseTree]:
     """
-    Removes one randomly chosen location from the given TA.
+    Computes a list of mutations of the given TA such that for each mutation one location is removed.
 
     :param tree: AST of TA to be mutated
-    :return: mutated TA AST
+    :return: list of mutated ASTs
     """
 
-    # choose location to be removed
-    suitable_locations = list(tree.find_data("location_declaration"))
+    mutations = []
+
+    # find non-initial locations
+    locations = list(tree.find_data("location_declaration"))
     initial_attribute = next(tree.find_data("initial_attribute"))
+    for location in locations:
+        if helpers.contains_child_node(location, initial_attribute):
+            locations.remove(location)
 
-    for location in suitable_locations:
-        if contains_child_node(location, initial_attribute):
-            suitable_locations.remove(location)
+    for location in locations:
+        process_id = location.children[2]
+        location_id = location.children[4]
 
-    location_to_be_removed = random.choice(suitable_locations)
-    process_id = location_to_be_removed.children[2]
-    location_id = location_to_be_removed.children[4]
+        # find all transitions going into or out of location
+        edges_to_be_removed = []
+        for edge in list(tree.find_data("edge_declaration")):
+            if(edge.children[2] == process_id and (edge.children[4] == location_id or edge.children[6] == location_id)):
+                edges_to_be_removed.append(edge)
 
-    # find all transitions going into or out of chosen location
-    edges_to_be_removed = []
-    for edge in list(tree.find_data("edge_declaration")):
-        if(edge.children[2] == process_id and (edge.children[4] == location_id or edge.children[6] == location_id)):
-            edges_to_be_removed.append(edge)
+        # remove location and transitions belonging to it
+        mutation = helpers.remove_node(tree, location)
+        for edge in edges_to_be_removed:
+            helpers.remove_node(mutation, edge)
+        mutations.append(mutation)
 
-    # remove location and transitions belonging to it
-    result = tree.__deepcopy__(None)
-    remove_node(result, location_to_be_removed)
-    for edge in edges_to_be_removed:
-        remove_node(result, edge)
+    return mutations
 
-    return result
-
-def remove_transition(tree: ParseTree) -> ParseTree:
+def remove_transition(tree: ParseTree) -> list[ParseTree]:
     """
-    Removes one randomly chosen transition from the given TA.
+    Computes a list of mutations of the given TA such that for each mutation one transition is removed.
 
     :param tree: AST of TA to be mutated
-    :return: mutated TA AST
+    :return: list of mutated ASTs
     """
 
-    edge_to_be_removed = choose_random_node_of_type(tree, "edge_declaration")
-    return remove_node(tree.__deepcopy__(None), edge_to_be_removed)
+    mutations = []
+
+    # find transitions
+    edges = list(tree.find_data("edge_declaration"))
+
+    for edge in edges:
+        mutation = helpers.remove_node(tree, edge)
+        mutations.append(mutation)
+
+    return mutations
     
 # other operators
 
 ###
-
-# helper functions
-
-def exchange_node(tree: ParseTree, old_node, new_node, occurrence_in_child_list: int = 1) -> ParseTree:
-    """
-    Exchanges old_node in given tree with new_node. By default, this method only exchanges the first occurrence of old_node in each node's child list.
-
-    :param tree: tree to be altered
-    :param old_node: node to be exchanged
-    :param new_node: node old_node is to be exchanged with
-    :param occurrence_in_child_list: If a node in the tree contains the old_node as a child multiple times, this parameter determines which one is exchanged. 
-                                     For example, if occurrence_in_child_list == 2, only the second occurrence of the node in each child list is exchanged.
-    :returns: tree with old_node exchanged with new_node
-    """
-
-    if(not contains_child_node(tree, old_node)):
-        raise ValueError("Tree does not contain node to be exchanged.")
-    
-    def exchange_node_helper(tree: ParseTree, old_node, new_node, occurrence_in_child_list) -> ParseTree:
-    
-        # old_node is direct child node of tree
-        if(occurrence_in_child_list <= tree.children.count(old_node)):
-            occurrences_so_far = 0
-            for i in range(len(tree.children)):
-                if(tree.children[i] == old_node):
-                    occurrences_so_far += 1
-                    if(occurrences_so_far == occurrence_in_child_list):
-                        tree.children[i] = new_node
-
-        # given node is no direct child node of tree
-        else:
-            new_children = []
-
-            for child in tree.children:
-                if(isinstance(child, Token)):
-                    new_children.append(child)
-                else:
-                    new_children.append(exchange_node_helper(child, old_node, new_node, occurrence_in_child_list))
-
-            tree.set(tree.data, new_children)
-
-        return tree
-
-    return exchange_node_helper(tree.__deepcopy__(None), old_node, new_node, occurrence_in_child_list)
-
-def remove_node(tree: ParseTree, node, occurrence_in_child_list: int = 1) -> ParseTree:
-    """
-    Removes given node from given tree. By default, this method only removes the first occurrence of the node in each node's child list.
-
-    :param tree: tree to be altered
-    :param node: node to be removed
-    :param occurrence_in_child_list: If a node in the tree contains the given node as a child multiple times, this parameter determines which one is removed. 
-                                     For example, if occurrence_in_child_list == 2, the only second occurrence of the node in each child list is removed.
-    :returns: tree without given node
-    """
-
-    if(not contains_child_node(tree, node)):
-        raise ValueError("Tree does not contain node to be removed.")
-    
-    def remove_node_helper(tree: ParseTree, node, occurrence_in_child_list) -> ParseTree:
-
-        # given node is direct child node of tree
-        if(occurrence_in_child_list <= tree.children.count(node)):
-            occurrences_so_far = 0
-
-            for i in range(len(tree.children)):
-                if(tree.children[i] == node):
-                    occurrences_so_far += 1
-                    if(occurrences_so_far == occurrence_in_child_list):
-                        idx = i
-
-            tree.children.pop(idx)
-        
-        # given node is no direct child node of tree
-        else:
-            new_children = []
-
-            for child in tree.children:
-                if(isinstance(child, Token)):
-                    new_children.append(child)
-                else:
-                    new_children.append(remove_node_helper(child, node, occurrence_in_child_list))
-
-            tree.set(tree.data, new_children)
-        
-        return tree
-
-    return remove_node_helper(tree.__deepcopy__(None), node, occurrence_in_child_list)
-
-def contains_child_node(tree, node) -> bool:
-    """
-    Determines whether given tree contains given node.
-    """
-
-    if(tree == node):
-        return True
-    
-    if(isinstance(tree, Tree)):
-        for child in tree.children:
-            if(contains_child_node(child, node)):
-                return True
-    return False
-
-def choose_random_node_of_type(tree: ParseTree, type: str) -> ParseTree:
-    """
-    Selects and returns a random node of given type in the given tree.
-
-    :param tree: tree to be searched
-    :param type: type of node to be returned
-    :returns: random node of given type in the given tree
-    """
-
-    options = list(tree.find_data(type))
-
-    if(0 == len(options)):
-        raise ValueError("Tree does not contain node of given type.")
-    
-    return random.choice(options)

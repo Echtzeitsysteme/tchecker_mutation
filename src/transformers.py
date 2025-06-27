@@ -1,5 +1,6 @@
 import lark
-import operators
+
+import helpers
 
 from lark import Transformer, ParseTree, Tree, Token
 
@@ -25,7 +26,7 @@ class SimplifyExpressions(Transformer):
         while i < len(result.children):
             if complex_expression == None:
                 return result
-            if operators.contains_child_node(result.children[i], complex_expression):
+            if helpers.contains_child_node(result.children[i], complex_expression):
 
                 # construct two simple expressions from complex expression
                 first_new_atomic_expr = Tree(Token('RULE', 'atomic_expr'), [Tree(Token('RULE', complex_expression.data), [complex_expression.children[0], complex_expression.children[1], complex_expression.children[2]])])
