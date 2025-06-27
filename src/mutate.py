@@ -23,6 +23,8 @@ def apply_mutation(ta_tree: lark.ParseTree, op: str) -> list[lark.ParseTree]:
             return operators.no_op(ta_tree)
         case "change_guard_cmp":
             return operators.change_guard_cmp(ta_tree)
+        case "add_location":
+            return operators.add_location(ta_tree)
         case "add_transition":
             return operators.add_transition(ta_tree)
         case "change_transition_source":
@@ -58,7 +60,7 @@ if "__main__" == __name__:
         type = str,
         required = True,
         help = "Mutation operator to be used.",
-        choices = ["no_op", "change_guard_cmp", "add_transition", "change_transition_source", "change_transition_target", "remove_location", "remove_transition"]
+        choices = ["no_op", "change_guard_cmp", "add_location", "add_transition", "change_transition_source", "change_transition_target", "remove_location", "remove_transition"]
     )
 
     args = parser.parse_args()

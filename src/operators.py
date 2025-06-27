@@ -1,18 +1,18 @@
 import helpers
 
-from lark import ParseTree, Token
+from lark import ParseTree, Token, Tree
 
 def no_op(tree: ParseTree) -> list[ParseTree]:
     """
     For testing purposes.
     """
+    print(tree)
     return [tree]
 
 # constraint changing operators
 
 def change_guard_cmp(tree: ParseTree) -> list[ParseTree]:
     """
-    Changes one comparator in a randomly chosen guard from the given TA.
     Computes a list of mutations of the given TA such that for each mutation one comparator in one guard is changed.
 
     :param tree: AST of TA to be mutated
@@ -83,6 +83,56 @@ def change_guard_cmp(tree: ParseTree) -> list[ParseTree]:
 
 # structure changing operators
 
+def add_location(tree: ParseTree) -> list[ParseTree]:
+    """
+    Computes a list of mutations of the given TA by adding a sink location.
+    For each mutation, one transition of the TA is redirected to the new location.
+
+    :param tree: AST of TA to be mutated
+    :return: list of mutated ASTs
+    """
+
+    mutations = []
+
+    # find processes
+    processes = list(tree.find_data("process_declaration"))
+
+    for process in processes:
+
+        process_id = process.children[2]
+        new_location_id = Tree(Token('RULE', 'id'), [Token('__ANON_0', 'new_loc')])
+        # attribute list for new location is empty
+        attributes = Tree(Token('RULE', 'attributes'), [Token('LEFT_BRACE_TOK', '{'), Token('RIGHT_BRACE_TOK', '}')])
+
+        # define new location
+        new_location = Tree(Token('RULE', 'location_declaration'), 
+                       [Token('LOCATION_TOK', 'location'), 
+                       Token('COLON_TOK', ':'), 
+                       process_id, 
+                       Token('COLON_TOK', ':'), 
+                       new_location_id, 
+                       attributes])
+        
+        # add new location 
+        mutation = tree.__deepcopy__(None)
+        new_location_index = mutation.children.index(process) + 1
+        mutation.children.insert(new_location_index, Token('NEWLINE_TOK', '\n\n'))
+        mutation.children.insert(new_location_index + 1, new_location)
+        mutation.children.insert(new_location_index + 2, Token('NEWLINE_TOK', '\n'))
+
+        # find transitions belonging to same process
+        edges = list(tree.find_pred(lambda t: t.data == "edge_declaration" and t.children[2] == process_id))
+        
+        # redirect transition
+        for edge in edges:
+
+            altered_edge = edge.__deepcopy__(None)
+            altered_edge.children[6] = new_location_id
+
+            mutations.append(helpers.exchange_node(mutation, edge, altered_edge))
+
+    return mutations
+
 def add_transition(tree: ParseTree) -> list[ParseTree]:
     """
     Computes a list of mutations of the given TA.
@@ -101,7 +151,7 @@ def add_transition(tree: ParseTree) -> list[ParseTree]:
 
         process_id = process.children[2]
 
-        # choose source and target location belonging to chosen process
+        # choose source and target location belonging to same process
         locations = []
         for location in tree.find_data("location_declaration"):
             if(location.children[2] == process_id):
