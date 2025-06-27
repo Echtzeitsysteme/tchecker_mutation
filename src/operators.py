@@ -263,11 +263,41 @@ def remove_transition(tree: ParseTree) -> list[ParseTree]:
     edges = list(tree.find_data("edge_declaration"))
 
     for edge in edges:
-        mutation = helpers.remove_node(tree, edge)
-        mutations.append(mutation)
+        # remove transition
+        mutations.append(helpers.remove_node(tree, edge))
 
     return mutations
     
 # other operators
 
-###
+def change_event(tree: ParseTree) -> list[ParseTree]:
+    """
+    Computes a list of mutations of the given TA such that for each mutation the event in one transition is changed.
+
+    :param tree: AST of TA to be mutated
+    :return: list of mutated ASTs
+    """
+
+    mutations = []
+
+    # find transitions
+    edges = list(tree.find_data("edge_declaration"))
+
+    # find events
+    events = []
+    for event in tree.find_data("event_declaration"):
+        events.append(event.children[2])
+
+    for edge in edges:
+        # find suitable new events
+        old_event = edge.children[8]
+        new_event_options = events.copy()
+        new_event_options.remove(old_event)
+
+        for event in new_event_options:
+            # exchange event
+            altered_edge = helpers.exchange_node(edge, old_event, event)
+            # exchange transition
+            mutations.append(helpers.exchange_node(tree, edge, altered_edge))
+
+    return mutations
