@@ -81,6 +81,71 @@ def change_guard_cmp(tree: ParseTree) -> list[ParseTree]:
                 
     return mutations
 
+def invert_reset(tree: ParseTree) -> list[ParseTree]:
+    """
+    Computes a list of mutations of the given TA.
+    For each mutation, the occurrence of one clock in the set of reset clocks of one guard is flipped.
+
+    :param tree: AST of TA to be mutated
+    :return: list of mutated ASTs
+    """
+
+    mutations = []
+
+    # find transitions
+    edges = list(tree.find_data("edge_declaration"))
+
+    # find clocks
+    clocks = []
+    for clock in tree.find_data("clock_declaration"):
+        clocks.append(clock.children[4])
+
+    for edge in edges:
+
+        # add attribute list if edge declaration does not already have one
+        if(10 > len(edge.children)):
+            attributes = Tree(Token('RULE', 'attributes'), [Token('LEFT_BRACE_TOK', '{'), Token('RIGHT_BRACE_TOK', '}')])
+            edge.children.append(attributes)
+
+        non_reset_clocks = clocks.copy()
+
+        # replace reset with nop if clock is reset by transition, add clock to non_reset_clocks otherwise
+        for do_attribute in edge.find_data("do_attribute"):
+            for assignment in do_attribute.find_pred(lambda t: t.data == "int_assignment" or t.data == "clock_assignment"):
+                for clock in clocks:
+                    if(isinstance(assignment.children[0], Tree) and clock == assignment.children[0].children[0]):
+                        non_reset_clocks.remove(clock)
+
+                        nop = Tree(Token('RULE', 'nop'), [Token('NOP_TOK', 'nop')])
+                        altered_edge = helpers.exchange_node(edge, assignment, nop)
+                        mutations.append(helpers.exchange_node(tree, edge, altered_edge))
+
+        # add reset to attributes list if clock is not reset by transition
+        for clock in non_reset_clocks:
+            # define new reset
+            new_reset = Tree(Token('RULE', 'do_attribute'), 
+                        [Token('DO_TOK', 'do'), 
+                        Token('COLON_TOK', ':'), 
+                        Tree(Token('RULE', 'stmt'), 
+                        [Tree(Token('RULE', 'clock_assignment'), 
+                        [Tree(Token('RULE', 'clock_id'), [clock]), 
+                        Token('ASSIGNMENT_TOK', '='), 
+                        Tree(Token('RULE', 'int_term'), 
+                        [Token('SIGNED_INT', '0')])])])])
+            colon = Token('COLON_TOK', ':')
+
+            # construct new edge
+            altered_edge = edge.__deepcopy__(None)
+            assert(isinstance(altered_edge.children[9], Tree))
+            # add colon after new reset if attributes list was nonempty before
+            if (altered_edge.children[9].children[1] != Token('RIGHT_BRACE_TOK', '}')):
+                altered_edge.children[9].children.insert(1, colon)
+            # add new reset
+            altered_edge.children[9].children.insert(1, new_reset)
+            mutations.append(helpers.exchange_node(tree, edge, altered_edge))
+
+    return mutations
+
 # structure changing operators
 
 def add_location(tree: ParseTree) -> list[ParseTree]:
@@ -168,6 +233,10 @@ def add_transition(tree: ParseTree) -> list[ParseTree]:
                 new_edge.children[4] = source_location
                 new_edge.children[6] = target_location
 
+                # skip this mutation if new edge is identical to cloned edge
+                if(new_edge == next(tree.find_data("edge_declaration"))):
+                    continue
+
                 # add transition    
                 mutation = tree.__deepcopy__(None)
                 mutation.children.append(Token('NEWLINE_TOK', '\n\n'))
@@ -237,7 +306,7 @@ def remove_location(tree: ParseTree) -> list[ParseTree]:
 
         # find all transitions going into or out of location
         edges_to_be_removed = []
-        for edge in list(tree.find_data("edge_declaration")):
+        for edge in tree.find_data("edge_declaration"):
             if(edge.children[2] == process_id and (edge.children[4] == location_id or edge.children[6] == location_id)):
                 edges_to_be_removed.append(edge)
 

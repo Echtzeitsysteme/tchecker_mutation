@@ -103,26 +103,3 @@ def contains_child_node(tree, node) -> bool:
             if(contains_child_node(child, node)):
                 return True
     return False
-
-# studs
-
-def check_syntax(ta: str) -> bool:
-    """
-    Checks whether given TA has correct TChecker syntax.
-    Not implemented yet.
-
-    :param ta: .txt or .tck file of TA.
-    :return: True iff given file has valid syntax.
-    """ 
-    return True
-
-def check_bisimilarity(first: str, second: str) -> bool:
-    """
-    Checks whether given TA are bisimilar.
-    Not implemented yet.
-
-    :param first: .txt or .tck file of first TA
-    :param second: .txt or .tck file of secon TA
-    :return: true iff given TA are bisimilar
-    """ 
-    return False

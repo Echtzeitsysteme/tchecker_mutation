@@ -7,6 +7,29 @@ import helpers
 import operators
 import transformers
 
+# studs
+
+def check_syntax(ta: str) -> bool:
+    """
+    Checks whether given TA has correct TChecker syntax.
+    Not implemented yet.
+
+    :param ta: .txt or .tck file of TA.
+    :return: True iff given file has valid syntax.
+    """ 
+    return True
+
+def check_bisimilarity(first: str, second: str) -> bool:
+    """
+    Checks whether given TA are bisimilar.
+    Not implemented yet.
+
+    :param first: .txt or .tck file of first TA
+    :param second: .txt or .tck file of secon TA
+    :return: true iff given TA are bisimilar
+    """ 
+    return False
+
 def apply_mutation(ta_tree: lark.ParseTree, op: str) -> list[lark.ParseTree]:
     """
     Applies mutation operator to given TA.
@@ -23,6 +46,8 @@ def apply_mutation(ta_tree: lark.ParseTree, op: str) -> list[lark.ParseTree]:
             return operators.no_op(ta_tree)
         case "change_guard_cmp":
             return operators.change_guard_cmp(ta_tree)
+        case "invert_reset":
+            return operators.invert_reset(ta_tree)
         case "add_location":
             return operators.add_location(ta_tree)
         case "add_transition":
@@ -64,6 +89,7 @@ if "__main__" == __name__:
         help = "Mutation operator to be used.",
         choices = ["no_op", 
                    "change_guard_cmp", 
+                   "invert_reset",
                    "add_location", 
                    "add_transition", 
                    "change_transition_source", 
@@ -81,7 +107,7 @@ if "__main__" == __name__:
     os.makedirs(out_dir, exist_ok=True)
 
     # assert that input TA file does not contain syntax errors
-    assert(helpers.check_syntax(in_ta))
+    assert(check_syntax(in_ta))
 
     # parsing input TA text file to AST
     parser = lark.Lark.open("parsing/grammar.lark", __file__)
@@ -104,10 +130,10 @@ if "__main__" == __name__:
         open(out_file, "wt+").write(out_ta)
 
         # assert that output TA file does not contain syntax errors
-        assert(helpers.check_syntax(out_file))
+        assert(check_syntax(out_file))
 
         # delete mutation if it is bisimilar to original
-        if(helpers.check_bisimilarity(in_ta, out_file)):
+        if(check_bisimilarity(in_ta, out_file)):
             os.remove(out_file)
 
         
