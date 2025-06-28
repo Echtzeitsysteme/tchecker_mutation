@@ -3,7 +3,6 @@ import os.path
 import lark
 import lark.reconstruct
 
-import helpers
 import operators
 import transformers
 
@@ -46,6 +45,10 @@ def apply_mutation(ta_tree: lark.ParseTree, op: str) -> list[lark.ParseTree]:
             return operators.no_op(ta_tree)
         case "change_guard_cmp":
             return operators.change_guard_cmp(ta_tree)
+        case "decrease_constraint_constant":
+            return operators.decrease_or_increase_constraint_constant(ta_tree, decrease_constant = True)
+        case "increase_constraint_constant":
+            return operators.decrease_or_increase_constraint_constant(ta_tree, decrease_constant = False)
         case "invert_reset":
             return operators.invert_reset(ta_tree)
         case "add_location":
@@ -89,6 +92,8 @@ if "__main__" == __name__:
         help = "Mutation operator to be used.",
         choices = ["no_op", 
                    "change_guard_cmp", 
+                   "decrease_constraint_constant",
+                   "increase_constraint_constant",
                    "invert_reset",
                    "add_location", 
                    "add_transition", 
