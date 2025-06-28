@@ -43,6 +43,8 @@ def apply_mutation(ta_tree: lark.ParseTree, op: str) -> list[lark.ParseTree]:
         case "no_op":
             # for testing purposes
             return operators.no_op(ta_tree)
+        case "change_event":
+            return operators.change_event(ta_tree)
         case "change_guard_cmp":
             return operators.change_guard_cmp(ta_tree)
         case "decrease_constraint_constant":
@@ -63,12 +65,24 @@ def apply_mutation(ta_tree: lark.ParseTree, op: str) -> list[lark.ParseTree]:
             return operators.remove_location(ta_tree)
         case "remove_transition":
             return operators.remove_transition(ta_tree)
-        case "change_event":
-            return operators.change_event(ta_tree)
         case _:
             raise ValueError("Unknown mutation operator.")
 
 if "__main__" == __name__:
+
+    op_choices = ["no_op", 
+                  "all",
+                  "change_event",
+                  "change_guard_cmp", 
+                  "decrease_constraint_constant",
+                  "increase_constraint_constant",
+                  "invert_reset",
+                  "add_location", 
+                  "add_transition", 
+                  "change_transition_source", 
+                  "change_transition_target", 
+                  "remove_location", 
+                  "remove_transition"]
 
     # input
     parser = argparse.ArgumentParser()
@@ -90,18 +104,7 @@ if "__main__" == __name__:
         type = str,
         required = True,
         help = "Mutation operator to be used.",
-        choices = ["no_op", 
-                   "change_guard_cmp", 
-                   "decrease_constraint_constant",
-                   "increase_constraint_constant",
-                   "invert_reset",
-                   "add_location", 
-                   "add_transition", 
-                   "change_transition_source", 
-                   "change_transition_target", 
-                   "remove_location", 
-                   "remove_transition", 
-                   "change_event"]
+        choices = op_choices
     )
 
     args = parser.parse_args()
@@ -115,31 +118,44 @@ if "__main__" == __name__:
     assert(check_syntax(in_ta))
 
     # parsing input TA text file to AST
-    parser = lark.Lark.open("parsing/grammar.lark", __file__)
-    parser.options.maybe_placeholders = False
-    in_ta_tree = parser.parse(open(in_ta).read())
+    ta_parser = lark.Lark.open("parsing/grammar.lark", __file__)
+    ta_parser.options.maybe_placeholders = False
+    in_ta_tree = ta_parser.parse(open(in_ta).read())
 
     # simplifying complex expressions in AST
     in_ta_tree = transformers.SimplifyExpressions().transform(in_ta_tree)
 
+    def write_mutations(mutations: list[lark.ParseTree], op: str) -> None:
+        for i in range(len(mutations)):
+            out_file = os.path.join(out_dir, f"{in_ta[:-4]}_mutation_{op}_{i}.tck")
+
+            # reconstructing TA text file from mutated AST
+            reconstructor = lark.reconstruct.Reconstructor(ta_parser)
+            out_ta = reconstructor.reconstruct(mutations[i])
+            open(out_file, "wt+").write(out_ta)
+
+            # assert that output TA file does not contain syntax errors
+            assert(check_syntax(out_file))
+
+            # delete mutation if it is bisimilar to original
+            if(check_bisimilarity(in_ta, out_file)):
+                os.remove(out_file)
+
     # compute mutations
-    mutations = apply_mutation(in_ta_tree.__deepcopy__(None), op)
+    if (op == "all"):
+        ops = op_choices.copy()
+        ops.remove("no_op")
+        ops.remove("all")
 
-    for i in range(len(mutations)):
+        for operator in ops:
+            mutations = apply_mutation(in_ta_tree.__deepcopy__(None), operator)
+            write_mutations(mutations, operator)
 
-        out_file = os.path.join(out_dir, f"{in_ta[:-4]}_mutation_{op}_{i}.tck")
+    else:
+        mutations = apply_mutation(in_ta_tree.__deepcopy__(None), op)
+        write_mutations(mutations, op)
 
-        # reconstructing TA text file from mutated AST
-        reconstructor = lark.reconstruct.Reconstructor(parser)
-        out_ta = reconstructor.reconstruct(mutations[i])
-        open(out_file, "wt+").write(out_ta)
-
-        # assert that output TA file does not contain syntax errors
-        assert(check_syntax(out_file))
-
-        # delete mutation if it is bisimilar to original
-        if(check_bisimilarity(in_ta, out_file)):
-            os.remove(out_file)
+    
 
         
     

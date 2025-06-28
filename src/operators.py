@@ -10,7 +10,36 @@ def no_op(tree: ParseTree) -> list[ParseTree]:
     print(tree)
     return [tree]
 
-# constraint changing operators
+# constraint/transition changing operators
+
+def change_event(tree: ParseTree) -> list[ParseTree]:
+    """
+    Computes a list of mutations of the given TA such that for each mutation the event in one transition is changed.
+
+    :param tree: AST of TA to be mutated
+    :return: list of mutated ASTs
+    """
+
+    mutations = []
+
+    # find events
+    events = []
+    for event in tree.find_data("event_declaration"):
+        events.append(event.children[2])
+
+    for edge in tree.find_data("edge_declaration"):
+        # find suitable new events
+        old_event = edge.children[8]
+        new_event_options = events.copy()
+        new_event_options.remove(old_event)
+
+        for event in new_event_options:
+            # exchange event
+            altered_edge = helpers.exchange_node(edge, old_event, event)
+            # exchange transition
+            mutations.append(helpers.exchange_node(tree, edge, altered_edge))
+
+    return mutations
 
 def change_guard_cmp(tree: ParseTree) -> list[ParseTree]:
     """
@@ -358,7 +387,7 @@ def remove_location(tree: ParseTree) -> list[ParseTree]:
         # remove location and transitions belonging to it
         mutation = helpers.remove_node(tree, location)
         for edge in edges_to_be_removed:
-            helpers.remove_node(mutation, edge)
+            mutation = helpers.remove_node(mutation, edge)
         mutations.append(mutation)
 
     return mutations
@@ -376,36 +405,5 @@ def remove_transition(tree: ParseTree) -> list[ParseTree]:
     for edge in tree.find_data("edge_declaration"):
         # remove transition
         mutations.append(helpers.remove_node(tree, edge))
-
-    return mutations
-    
-# other operators
-
-def change_event(tree: ParseTree) -> list[ParseTree]:
-    """
-    Computes a list of mutations of the given TA such that for each mutation the event in one transition is changed.
-
-    :param tree: AST of TA to be mutated
-    :return: list of mutated ASTs
-    """
-
-    mutations = []
-
-    # find events
-    events = []
-    for event in tree.find_data("event_declaration"):
-        events.append(event.children[2])
-
-    for edge in tree.find_data("edge_declaration"):
-        # find suitable new events
-        old_event = edge.children[8]
-        new_event_options = events.copy()
-        new_event_options.remove(old_event)
-
-        for event in new_event_options:
-            # exchange event
-            altered_edge = helpers.exchange_node(edge, old_event, event)
-            # exchange transition
-            mutations.append(helpers.exchange_node(tree, edge, altered_edge))
 
     return mutations
