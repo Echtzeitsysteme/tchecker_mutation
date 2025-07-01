@@ -1,4 +1,4 @@
-import helpers
+import AST_tools
 
 from lark import ParseTree, Token, Tree
 
@@ -10,7 +10,7 @@ def no_op(tree: ParseTree) -> list[ParseTree]:
     print(tree)
     return [tree]
 
-# constraint/transition changing operators
+# attribute changing operators
 
 def change_event(tree: ParseTree) -> list[ParseTree]:
     """
@@ -35,9 +35,9 @@ def change_event(tree: ParseTree) -> list[ParseTree]:
 
         for event in new_event_options:
             # exchange event
-            altered_edge = helpers.exchange_node(edge, old_event, event)
+            altered_edge = AST_tools.exchange_node(edge, old_event, event)
             # exchange transition
-            mutations.append(helpers.exchange_node(tree, edge, altered_edge))
+            mutations.append(AST_tools.exchange_node(tree, edge, altered_edge))
 
     return mutations
 
@@ -72,7 +72,7 @@ def change_guard_cmp(tree: ParseTree) -> list[ParseTree]:
                 # check whether expression is a clock expression (lark might falsely classify a clock expression as a predicate expression, therefore additional checking is needed)
                 is_clock_expr = False
                 for clock_declaration in tree.find_data("clock_declaration"):
-                    if(helpers.contains_child_node(expr, clock_declaration.children[4])):
+                    if(AST_tools.contains_child_node(expr, clock_declaration.children[4])):
                         is_clock_expr = True
                         break
 
@@ -93,11 +93,11 @@ def change_guard_cmp(tree: ParseTree) -> list[ParseTree]:
                     new_cmp_node = Token(cmp_token_names[cmp], cmp)
 
                     # change node
-                    altered_expr = helpers.exchange_node(expr, old_cmp_node, new_cmp_node)
-                    altered_guard = helpers.exchange_node(guard, expr, altered_expr)
-                    altered_edge = helpers.exchange_node(edge, guard, altered_guard)
+                    altered_expr = AST_tools.exchange_node(expr, old_cmp_node, new_cmp_node)
+                    altered_guard = AST_tools.exchange_node(guard, expr, altered_expr)
+                    altered_edge = AST_tools.exchange_node(edge, guard, altered_guard)
 
-                    mutations.append(helpers.exchange_node(tree, edge, altered_edge))
+                    mutations.append(AST_tools.exchange_node(tree, edge, altered_edge))
                 
     return mutations
 
@@ -116,10 +116,10 @@ def decrease_or_increase_constraint_constant(tree: ParseTree, decrease_constant:
         # check whether first or second compared value is constant
         is_clock_expr = False
         for clock_declaration in tree.find_data("clock_declaration"):
-            if(helpers.contains_child_node(expr.children[0], clock_declaration.children[4])):
+            if(AST_tools.contains_child_node(expr.children[0], clock_declaration.children[4])):
                 old_constant_node = expr.children[2]
                 is_clock_expr = True
-            elif(helpers.contains_child_node(expr.children[2], clock_declaration.children[4])):
+            elif(AST_tools.contains_child_node(expr.children[2], clock_declaration.children[4])):
                 old_constant_node = expr.children[0]
                 is_clock_expr = True
         # skip expression if it is no clock expression (lark might falsely classify a clock expression as a predicate expression, therefore additional checking is needed)
@@ -130,7 +130,7 @@ def decrease_or_increase_constraint_constant(tree: ParseTree, decrease_constant:
         one_node = Tree(Token('RULE', 'int_term'), [Token('SIGNED_INT', '1')])
         new_constant_node = Tree(Token('RULE', 'int_term'), [old_constant_node, op_node, one_node])
 
-        return helpers.exchange_node(expr, old_constant_node, new_constant_node)
+        return AST_tools.exchange_node(expr, old_constant_node, new_constant_node)
         
     # change guards
     for edge in tree.find_data("edge_declaration"):
@@ -145,10 +145,10 @@ def decrease_or_increase_constraint_constant(tree: ParseTree, decrease_constant:
                 if(altered_expr == None):
                     continue
                 
-                altered_guard = helpers.exchange_node(guard, expr, altered_expr)
-                altered_edge = helpers.exchange_node(edge, guard, altered_guard)
+                altered_guard = AST_tools.exchange_node(guard, expr, altered_expr)
+                altered_edge = AST_tools.exchange_node(edge, guard, altered_guard)
 
-                mutations.append(helpers.exchange_node(tree, edge, altered_edge))
+                mutations.append(AST_tools.exchange_node(tree, edge, altered_edge))
 
     # change invariants
     for location in tree.find_data("location_declaration"):
@@ -163,10 +163,10 @@ def decrease_or_increase_constraint_constant(tree: ParseTree, decrease_constant:
                 if(altered_expr == None):
                     continue
                 
-                altered_invariant = helpers.exchange_node(invariant, expr, altered_expr)
-                altered_location = helpers.exchange_node(location, invariant, altered_invariant)
+                altered_invariant = AST_tools.exchange_node(invariant, expr, altered_expr)
+                altered_location = AST_tools.exchange_node(location, invariant, altered_invariant)
 
-                mutations.append(helpers.exchange_node(tree, location, altered_location))
+                mutations.append(AST_tools.exchange_node(tree, location, altered_location))
 
     return mutations
 
@@ -174,6 +174,7 @@ def invert_reset(tree: ParseTree) -> list[ParseTree]:
     """
     Computes a list of mutations of the given TA.
     For each mutation, the occurrence of one clock in the set of reset clocks of one guard is flipped.
+    Only considers resets to 0.
 
     :param tree: AST of TA to be mutated
     :return: list of mutated ASTs
@@ -203,8 +204,8 @@ def invert_reset(tree: ParseTree) -> list[ParseTree]:
                         non_reset_clocks.remove(clock)
 
                         nop = Tree(Token('RULE', 'nop'), [Token('NOP_TOK', 'nop')])
-                        altered_edge = helpers.exchange_node(edge, assignment, nop)
-                        mutations.append(helpers.exchange_node(tree, edge, altered_edge))
+                        altered_edge = AST_tools.exchange_node(edge, assignment, nop)
+                        mutations.append(AST_tools.exchange_node(tree, edge, altered_edge))
 
         # add reset to attributes list if clock is not reset by transition
         for clock in non_reset_clocks:
@@ -228,7 +229,51 @@ def invert_reset(tree: ParseTree) -> list[ParseTree]:
                 altered_edge.children[9].children.insert(1, colon)
             # add new reset
             altered_edge.children[9].children.insert(1, new_reset)
-            mutations.append(helpers.exchange_node(tree, edge, altered_edge))
+            mutations.append(AST_tools.exchange_node(tree, edge, altered_edge))
+
+    return mutations
+
+def make_location_urgent_or_committed(tree: ParseTree, make_committed: bool) -> list[ParseTree]:
+    """
+    Computes a list of mutations of the given TA such that for each mutation either one originally non-urgent location becomes urgent or one originally non-committed location becomes committed.
+
+    :param tree: AST of TA to be mutated
+    :param make_committed: Method turns location committed iff True, urgent otherwise.
+    :return: list of mutated ASTs
+    """
+
+    mutations = []
+
+    if(make_committed):
+        attribute = Tree(Token('RULE', 'committed_attribute'), 
+                    [Token('COMMITTED_TOK', 'committed'), 
+                    Token('COLON_TOK', ':')])
+    else:
+        attribute = Tree(Token('RULE', 'urgent_attribute'), 
+                    [Token('URGENT_TOK', 'urgent'), 
+                    Token('COLON_TOK', ':')])    
+
+    for location in tree.find_data("location_declaration"):
+        # skip location if it already is urgent/committed
+        if(AST_tools.contains_child_node(location, attribute)):
+            continue
+
+        # add attribute list if location declaration does not already have one
+        if(6 > len(location.children)):
+            attributes = Tree(Token('RULE', 'attributes'), [Token('LEFT_BRACE_TOK', '{'), Token('RIGHT_BRACE_TOK', '}')])
+            location.children.append(attributes)
+
+        colon = Token('COLON_TOK', ':')
+
+        # construct new location
+        altered_location = location.__deepcopy__(None)
+        assert(isinstance(altered_location.children[5], Tree))
+        # add colon after new attribute if attributes list was nonempty before
+        if (altered_location.children[5].children[1] != Token('RIGHT_BRACE_TOK', '}')):
+            altered_location.children[5].children.insert(1, colon)
+        # add new attribute
+        altered_location.children[5].children.insert(1, attribute)
+        mutations.append(AST_tools.exchange_node(tree, location, altered_location))
 
     return mutations
 
@@ -274,7 +319,7 @@ def add_location(tree: ParseTree) -> list[ParseTree]:
             altered_edge = edge.__deepcopy__(None)
             altered_edge.children[6] = new_location_id
 
-            mutations.append(helpers.exchange_node(mutation, edge, altered_edge))
+            mutations.append(AST_tools.exchange_node(mutation, edge, altered_edge))
 
     return mutations
 
@@ -352,8 +397,8 @@ def change_transition_source_or_target(tree: ParseTree, change_source: bool) -> 
             
         for location in new_location_options:
             # change transition
-            altered_edge = helpers.exchange_node(edge, old_location, location, occurrence)
-            mutations.append(helpers.exchange_node(tree, edge, altered_edge))
+            altered_edge = AST_tools.exchange_node(edge, old_location, location, occurrence)
+            mutations.append(AST_tools.exchange_node(tree, edge, altered_edge))
 
     return mutations
 
@@ -371,7 +416,7 @@ def remove_location(tree: ParseTree) -> list[ParseTree]:
     locations = list(tree.find_data("location_declaration"))
     initial_attribute = next(tree.find_data("initial_attribute"))
     for location in locations:
-        if helpers.contains_child_node(location, initial_attribute):
+        if AST_tools.contains_child_node(location, initial_attribute):
             locations.remove(location)
 
     for location in locations:
@@ -385,9 +430,9 @@ def remove_location(tree: ParseTree) -> list[ParseTree]:
                 edges_to_be_removed.append(edge)
 
         # remove location and transitions belonging to it
-        mutation = helpers.remove_node(tree, location)
+        mutation = AST_tools.remove_node(tree, location)
         for edge in edges_to_be_removed:
-            mutation = helpers.remove_node(mutation, edge)
+            mutation = AST_tools.remove_node(mutation, edge)
         mutations.append(mutation)
 
     return mutations
@@ -404,6 +449,6 @@ def remove_transition(tree: ParseTree) -> list[ParseTree]:
 
     for edge in tree.find_data("edge_declaration"):
         # remove transition
-        mutations.append(helpers.remove_node(tree, edge))
+        mutations.append(AST_tools.remove_node(tree, edge))
 
     return mutations
