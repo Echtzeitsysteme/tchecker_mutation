@@ -104,13 +104,13 @@ LOGICAL_NOT_TOK: "!"
 predicate_expr: int_term _cmp int_term
               | int_term _less_cmp int_term _less_cmp int_term
 
-int_id: id (LEFT_BRACKET_TOK int_term RIGHT_BRACKET_TOK)?
+int_or_clock_id: id (LEFT_BRACKET_TOK int_term RIGHT_BRACKET_TOK)?
 
 int_term: LEFT_PARANTHESES_TOK int_term RIGHT_PARANTHESES_TOK
         | SIGNED_INT
         | OP_SUB_TOK int_term
         | int_term op int_term 
-        | int_id 
+        | int_or_clock_id 
 
 op: OP_ADD_TOK | OP_SUB_TOK | OP_MULT_TOK | OP_DIV_TOK | OP_MOD_TOK
 OP_ADD_TOK: "+"
@@ -124,9 +124,7 @@ clock_expr: clock_term _clock_cmp int_term
           | int_term _clock_cmp clock_term
           | int_term _less_cmp clock_term _less_cmp int_term
 
-clock_term: clock_id (OP_SUB_TOK clock_id)?
-
-clock_id: id (LEFT_BRACKET_TOK int_term RIGHT_BRACKET_TOK)?
+clock_term: int_or_clock_id (OP_SUB_TOK int_or_clock_id)?
 
 _cmp: CMP_NEQ_TOK | _clock_cmp
 _clock_cmp : CMP_EQ_TOK | CMP_GEQ_TOK | CMP_GT_TOK | _less_cmp
@@ -161,9 +159,9 @@ ELSE_TOK: "else"
 END_TOK: "end"
 WHILE_TOK: "while"
 
-int_assignment: int_id ASSIGNMENT_TOK int_term
+int_assignment: int_or_clock_id ASSIGNMENT_TOK int_term
 
-clock_assignment: clock_id ASSIGNMENT_TOK int_term (OP_ADD_TOK clock_id)?
+clock_assignment: int_or_clock_id ASSIGNMENT_TOK int_term (OP_ADD_TOK int_or_clock_id)?
 
 local_statement: LOCAL_TOK id (LEFT_BRACKET_TOK int_term RIGHT_BRACKET_TOK)?
                | LOCAL_TOK id ASSIGNMENT_TOK int_term

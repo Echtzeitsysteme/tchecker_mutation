@@ -1,5 +1,7 @@
 import AST_tools
 
+import sys
+
 from lark import ParseTree, Token, Tree
 
 def no_op(tree: ParseTree) -> list[ParseTree]:
@@ -43,7 +45,7 @@ def change_event(tree: ParseTree) -> list[ParseTree]:
 
 def change_guard_cmp(tree: ParseTree) -> list[ParseTree]:
     """
-    Computes a list of mutations of the given TA such that for each mutation one comparator in one guard is changed.
+    Computes a list of mutations of the given TA such that for each mutation one comparator of one clock expression in one guard is changed.
 
     :param tree: AST of TA to be mutated
     :return: list of mutated ASTs
@@ -52,9 +54,8 @@ def change_guard_cmp(tree: ParseTree) -> list[ParseTree]:
     mutations = []
 
     # cmp definitions
-    cmps = ["==", "<=", "<", ">=", ">", "!="]
+    cmps = ["==", "<=", "<", ">=", ">"]
     cmp_token_names = {
-                "!=": "CMP_NEQ_TOK",
                 "==": "CMP_EQ_TOK",
                 "<=": "CMP_LEQ_TOK",
                 "<": "CMP_LT_TOK",
@@ -75,14 +76,13 @@ def change_guard_cmp(tree: ParseTree) -> list[ParseTree]:
                     if(AST_tools.contains_child_node(expr, clock_declaration.children[4])):
                         is_clock_expr = True
                         break
+                # skip expression if it is no clock expression
+                if(not is_clock_expr):
+                    continue                
 
-                # if expression is clock expression, new comparator can not be !=
+                # new comparator can not be old comparator       
+                old_cmp = next(expr.scan_values(lambda t: t in cmps))
                 cmp_options = cmps.copy()
-                if(is_clock_expr):
-                    cmp_options.remove("!=")
-
-                # new comparator can not be old comparator
-                old_cmp = next(expr.scan_values(lambda t: t in cmp_options))
                 cmp_options.remove(old_cmp)
 
                 # define old comparator node
@@ -185,7 +185,13 @@ def invert_reset(tree: ParseTree) -> list[ParseTree]:
     # find clocks
     clocks = []
     for clock in tree.find_data("clock_declaration"):
-        clocks.append(clock.children[4])
+        for i in range(int(str(clock.children[2]))):
+            clock_id = clock.children[4]
+            clock_node = Tree(Token('RULE', 'int_or_clock_id'), 
+                         [clock_id, Token('LEFT_BRACKET_TOK', '['), 
+                         Tree(Token('RULE', 'int_term'), [Token('SIGNED_INT', i)]), 
+                         Token('RIGHT_BRACKET_TOK', ']')])
+            clocks.append(clock_node)
 
     for edge in tree.find_data("edge_declaration"):
 
@@ -200,7 +206,9 @@ def invert_reset(tree: ParseTree) -> list[ParseTree]:
         for do_attribute in edge.find_data("do_attribute"):
             for assignment in do_attribute.find_pred(lambda t: t.data == "int_assignment" or t.data == "clock_assignment"):
                 for clock in clocks:
-                    if(isinstance(assignment.children[0], Tree) and clock == assignment.children[0].children[0]):
+                    # also consider resets of form x = 0 in addition to x[0] = 0
+                    is_simple_clock_reset_of_same_clock = isinstance(assignment.children[0], Tree) and len(assignment.children[0].children) == 1 and clock.children[0] == assignment.children[0].children[0]
+                    if(clock == assignment.children[0] or is_simple_clock_reset_of_same_clock):
                         non_reset_clocks.remove(clock)
 
                         nop = Tree(Token('RULE', 'nop'), [Token('NOP_TOK', 'nop')])
@@ -215,7 +223,7 @@ def invert_reset(tree: ParseTree) -> list[ParseTree]:
                         Token('COLON_TOK', ':'), 
                         Tree(Token('RULE', 'stmt'), 
                         [Tree(Token('RULE', 'clock_assignment'), 
-                        [Tree(Token('RULE', 'clock_id'), [clock]), 
+                        [clock, 
                         Token('ASSIGNMENT_TOK', '='), 
                         Tree(Token('RULE', 'int_term'), 
                         [Token('SIGNED_INT', '0')])])])])
@@ -290,10 +298,16 @@ def add_location(tree: ParseTree) -> list[ParseTree]:
 
     mutations = []
 
+    # find fresh location id non-existent in original TA
+    new_location_id = Tree(Token('RULE', 'id'), [Token('__ANON_0', 'new_loc')])
+    for i in range(sys.maxsize):
+        if(not AST_tools.contains_child_node(tree, new_location_id)):
+            break
+        new_location_id = Tree(Token('RULE', 'id'), [Token('__ANON_0', f'new_loc_{i}')])
+
     for process in tree.find_data("process_declaration"):
 
         process_id = process.children[2]
-        new_location_id = Tree(Token('RULE', 'id'), [Token('__ANON_0', 'new_loc')])
         # attribute list for new location is empty
         attributes = Tree(Token('RULE', 'attributes'), [Token('LEFT_BRACE_TOK', '{'), Token('RIGHT_BRACE_TOK', '}')])
 

@@ -18,13 +18,24 @@ def check_syntax(ta: str) -> bool:
     """ 
     return True
 
+def check_reachability(ta: str) -> bool:
+    """
+    Checks reachability of the given TA.
+    Not implemented yet.
+
+    :param ta: .txt or .tck file of TA.
+    :return: True iff reachability check was successful.
+    :raises Error: if TA file is semantically faulty
+    """ 
+    return True
+
 def check_bisimilarity(first: str, second: str) -> bool:
     """
     Checks whether given TA are bisimilar.
     Not implemented yet.
 
     :param first: .txt or .tck file of first TA
-    :param second: .txt or .tck file of secon TA
+    :param second: .txt or .tck file of second TA
     :return: true iff given TA are bisimilar
     """ 
     return False
@@ -142,6 +153,12 @@ if "__main__" == __name__:
 
             # assert that output TA file does not contain syntax errors
             assert(check_syntax(out_file))
+
+            # delete mutation if it is semantically faulty
+            try:
+                check_reachability(out_file)
+            except:
+                os.remove(out_file)
 
             # delete mutation if it is bisimilar to original
             if(check_bisimilarity(in_ta, out_file)):
