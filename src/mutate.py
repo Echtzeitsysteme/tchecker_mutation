@@ -65,10 +65,10 @@ def apply_mutation(ta_tree: lark.ParseTree, op: str) -> list[lark.ParseTree]:
             return operators.decrease_or_increase_constraint_constant(ta_tree, decrease_constant = False)
         case "invert_reset":
             return operators.invert_reset(ta_tree)
-        case "make_location_committed":
-            return operators.make_location_urgent_or_committed(ta_tree, make_committed = True)
-        case "make_location_urgent":
-            return operators.make_location_urgent_or_committed(ta_tree, make_committed = False)
+        case "flip_committed_location":
+            return operators.flip_urgent_or_committed_location(ta_tree, flip_committed = True)
+        case "flip_urgent_location":
+            return operators.flip_urgent_or_committed_location(ta_tree, flip_committed = False)
         case "negate_guard":
             return operators.negate_guard(ta_tree)
         case "add_location":
@@ -95,8 +95,8 @@ if "__main__" == __name__:
                   "decrease_constraint_constant",
                   "increase_constraint_constant",
                   "invert_reset",
-                  "make_location_committed",
-                  "make_location_urgent",
+                  "flip_committed_location",
+                  "flip_urgent_location",
                   "negate_guard",
                   "add_location", 
                   "add_transition", 

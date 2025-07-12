@@ -225,18 +225,18 @@ def invert_reset(tree: ParseTree) -> list[ParseTree]:
 
     return mutations
 
-def make_location_urgent_or_committed(tree: ParseTree, make_committed: bool) -> list[ParseTree]:
+def flip_urgent_or_committed_location(tree: ParseTree, flip_committed: bool) -> list[ParseTree]:
     """
-    Computes a list of mutations of the given TA such that for each mutation either one originally non-urgent location becomes urgent or one originally non-committed location becomes committed.
+    Computes a list of mutations of the given TA such that for each mutation the urgent or committed attribute of one location gets flipped (added if non-existent, removed if existent).
 
     :param tree: AST of TA to be mutated
-    :param make_committed: Method turns location committed iff True, urgent otherwise.
+    :param flip_committed: Method turns location committed iff True, urgent otherwise.
     :return: list of mutated ASTs
     """
 
     mutations = []
 
-    if(make_committed):
+    if(flip_committed):
         attribute = Tree(Token('RULE', 'committed_attribute'),
                          [Token('COMMITTED_TOK', 'committed'), Token('COLON_TOK', ':')])
     else:
@@ -244,8 +244,23 @@ def make_location_urgent_or_committed(tree: ParseTree, make_committed: bool) -> 
                          [Token('URGENT_TOK', 'urgent'), Token('COLON_TOK', ':')])    
 
     for location in tree.find_data("location_declaration"):
-        # skip location if it already is urgent/committed
+        # remove attribute if it already is urgent/committed
         if(AST_tools.contains_child_node(location, attribute)):
+            altered_location = copy.deepcopy(location)
+
+            assert(isinstance(altered_location.children[5], Tree))
+            idx = altered_location.children[5].children.index(attribute)
+
+            # remove preceeding and succeeding colons if necessary
+            if(idx > 1):
+                altered_location.children[5].children.pop(idx - 1)
+                idx = idx - 1
+            elif(idx < len(altered_location.children[5].children) - 2):
+                altered_location.children[5].children.pop(idx + 1)
+
+            # remove attribute
+            altered_location = AST_tools.remove_node(altered_location, attribute)
+            mutations.append(AST_tools.exchange_node(tree, location, altered_location))
             continue
 
         # add attribute list if location declaration does not already have one
