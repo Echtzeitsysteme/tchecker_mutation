@@ -1,10 +1,11 @@
+import operators
+import transformers
+
 import argparse
 import os.path
 import lark
 import lark.reconstruct
-
-import operators
-import transformers
+import copy
 
 # studs
 
@@ -68,6 +69,8 @@ def apply_mutation(ta_tree: lark.ParseTree, op: str) -> list[lark.ParseTree]:
             return operators.make_location_urgent_or_committed(ta_tree, make_committed = True)
         case "make_location_urgent":
             return operators.make_location_urgent_or_committed(ta_tree, make_committed = False)
+        case "negate_guard":
+            return operators.negate_guard(ta_tree)
         case "add_location":
             return operators.add_location(ta_tree)
         case "add_transition":
@@ -94,6 +97,7 @@ if "__main__" == __name__:
                   "invert_reset",
                   "make_location_committed",
                   "make_location_urgent",
+                  "negate_guard",
                   "add_location", 
                   "add_transition", 
                   "change_transition_source", 
@@ -171,11 +175,11 @@ if "__main__" == __name__:
         ops.remove("all")
 
         for operator in ops:
-            mutations = apply_mutation(in_ta_tree.__deepcopy__(None), operator)
+            mutations = apply_mutation(copy.deepcopy(in_ta_tree), operator)
             write_mutations(mutations, operator)
 
     else:
-        mutations = apply_mutation(in_ta_tree.__deepcopy__(None), op)
+        mutations = apply_mutation(copy.deepcopy(in_ta_tree), op)
         write_mutations(mutations, op)
 
     

@@ -95,7 +95,7 @@ expr: LEFT_PARANTHESES_TOK atomic_expr (LOGICAL_AND_TOK atomic_expr)* RIGHT_PARA
 LOGICAL_AND_TOK: "&&"
 
 atomic_expr: LEFT_PARANTHESES_TOK atomic_expr RIGHT_PARANTHESES_TOK
-           | LOGICAL_NOT_TOK atomic_expr
+           | LOGICAL_NOT_TOK atomic_expr // not allowed for clock expressions in practice
            | predicate_expr
            | clock_expr
            | int_term
