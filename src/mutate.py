@@ -41,7 +41,7 @@ def check_bisimilarity(first: str, second: str) -> bool:
     """ 
     return False
 
-def apply_mutation(ta_tree: lark.ParseTree, op: str) -> list[lark.ParseTree]:
+def apply_mutation(ta_tree: lark.ParseTree, op: str, value: int) -> list[lark.ParseTree]:
     """
     Applies mutation operator to given TA.
 
@@ -57,12 +57,12 @@ def apply_mutation(ta_tree: lark.ParseTree, op: str) -> list[lark.ParseTree]:
             return operators.no_op(ta_tree)
         case "change_event":
             return operators.change_event(ta_tree)
-        case "change_guard_cmp":
-            return operators.change_guard_cmp(ta_tree)
+        case "change_constraint_cmp":
+            return operators.change_constraint_cmp(ta_tree)
         case "decrease_constraint_constant":
-            return operators.decrease_or_increase_constraint_constant(ta_tree, decrease_constant = True)
+            return operators.decrease_or_increase_constraint_constant(ta_tree, decrease_constant = True, value = value)
         case "increase_constraint_constant":
-            return operators.decrease_or_increase_constraint_constant(ta_tree, decrease_constant = False)
+            return operators.decrease_or_increase_constraint_constant(ta_tree, decrease_constant = False, value = value)
         case "invert_reset":
             return operators.invert_reset(ta_tree)
         case "flip_committed_location":
@@ -91,7 +91,7 @@ if "__main__" == __name__:
     op_choices = ["no_op", 
                   "all",
                   "change_event",
-                  "change_guard_cmp", 
+                  "change_constraint_cmp", 
                   "decrease_constraint_constant",
                   "increase_constraint_constant",
                   "invert_reset",
@@ -127,11 +127,24 @@ if "__main__" == __name__:
         help = "Mutation operator to be used.",
         choices = op_choices
     )
+    parser.add_argument(
+        "--val",
+        type = str,
+        required = False,
+        help = "Value to decrease/increase constants by (for operators decrease_constraint_constant and increase_constraint_constant). Must be positive integer. Default is 1." 
+    )
 
     args = parser.parse_args()
     in_ta = args.in_ta
     out_dir = args.out_dir
     op = args.op
+
+    if(args.val):
+        if(not(op == "decrease_constraint_constant" or op == "increase_constraint_constant" or op == "all")):
+            raise Warning("Value argument is not needed for this operator and will be omitted.")
+        value = args.val
+    else:
+        value = 1
 
     os.makedirs(out_dir, exist_ok=True)
 
@@ -175,11 +188,11 @@ if "__main__" == __name__:
         ops.remove("all")
 
         for operator in ops:
-            mutations = apply_mutation(copy.deepcopy(in_ta_tree), operator)
+            mutations = apply_mutation(copy.deepcopy(in_ta_tree), operator, value)
             write_mutations(mutations, operator)
 
     else:
-        mutations = apply_mutation(copy.deepcopy(in_ta_tree), op)
+        mutations = apply_mutation(copy.deepcopy(in_ta_tree), op, value)
         write_mutations(mutations, op)
 
     

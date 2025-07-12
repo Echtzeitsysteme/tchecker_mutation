@@ -55,9 +55,9 @@ def change_event(tree: ParseTree) -> list[ParseTree]:
 
     return mutations
 
-def change_guard_cmp(tree: ParseTree) -> list[ParseTree]:
+def change_constraint_cmp(tree: ParseTree) -> list[ParseTree]:
     """
-    Computes a list of mutations of the given TA such that for each mutation one comparator of one clock expression in one guard is changed.
+    Computes a list of mutations of the given TA such that for each mutation one comparator of one clock expression in one guard or invariant is changed.
 
     :param tree: AST of TA to be mutated
     :return: list of mutated ASTs
@@ -65,11 +65,19 @@ def change_guard_cmp(tree: ParseTree) -> list[ParseTree]:
 
     mutations = []
     
-    for edge in tree.find_data("edge_declaration"):
-        for guard in edge.find_data("provided_attribute"):
+    edges_and_locations = list(tree.find_data("edge_declaration"))
+    edges_and_locations.extend(tree.find_data("location_declaration"))
 
-            atomic_expressions = list(guard.find_data("predicate_expr"))
-            atomic_expressions.extend(guard.find_data("clock_expr"))
+    for edge_or_location in edges_and_locations:
+        if (edge_or_location.data == "edge_declaration"):
+            constraints = edge_or_location.find_data("provided_attribute")
+        else:
+            constraints = edge_or_location.find_data("invariant_attribute")
+
+        for constraint in constraints:
+
+            atomic_expressions = list(constraint.find_data("predicate_expr"))
+            atomic_expressions.extend(constraint.find_data("clock_expr"))
             clock_expressions = filter(lambda e: AST_tools.is_clock_expr(tree, e), atomic_expressions)
 
             for expr in clock_expressions:
@@ -86,70 +94,60 @@ def change_guard_cmp(tree: ParseTree) -> list[ParseTree]:
 
                     # change node
                     altered_expr = AST_tools.exchange_node(expr, old_cmp_node, cmp_tokens[cmp])
-                    altered_guard = AST_tools.exchange_node(guard, expr, altered_expr)
-                    altered_edge = AST_tools.exchange_node(edge, guard, altered_guard)
+                    altered_constraint = AST_tools.exchange_node(constraint, expr, altered_expr)
+                    altered_edge_or_location = AST_tools.exchange_node(edge_or_location, constraint, altered_constraint)
 
-                    mutations.append(AST_tools.exchange_node(tree, edge, altered_edge))
+                    mutations.append(AST_tools.exchange_node(tree, edge_or_location, altered_edge_or_location))
                 
     return mutations
 
-def decrease_or_increase_constraint_constant(tree: ParseTree, decrease_constant: bool) -> list[ParseTree]:
+def decrease_or_increase_constraint_constant(tree: ParseTree, decrease_constant: bool, value: int) -> list[ParseTree]:
     """
-    Computes a list of mutations of the given TA such that for each mutation the constant in one clock constraint is decreased or increased by one.
+    Computes a list of mutations of the given TA such that for each mutation the constant in one clock constraint is decreased or increased by given value.
 
     :param tree: AST of TA to be mutated
     :param decrease_constant: Method decreases constant iff True, increases otherwise.
+    :param value: value to decrease/increase constant by
     :return: list of mutated ASTs
     """
 
     mutations = []
-
-    def get_altered_expr_node(expr: ParseTree) -> ParseTree:
-
-        # check whether first or second compared value is constant
-        for clock_declaration in tree.find_data("clock_declaration"):
-            if(AST_tools.contains_child_node(expr.children[0], clock_declaration.children[4])):
-                old_constant_node = expr.children[2]
-            elif(AST_tools.contains_child_node(expr.children[2], clock_declaration.children[4])):
-                old_constant_node = expr.children[0]
-
-        op_node = Tree(Token('RULE', 'op'), [Token('OP_SUB_TOK', '-')]) if decrease_constant else Tree(Token('RULE', 'op'), [Token('OP_ADD_TOK', '+')])
-        one_node = Tree(Token('RULE', 'int_term'), [Token('SIGNED_INT', '1')])
-        new_constant_node = Tree(Token('RULE', 'int_term'), [old_constant_node, op_node, one_node])
-
-        return AST_tools.exchange_node(expr, old_constant_node, new_constant_node)
         
-    # change guards
-    for edge in tree.find_data("edge_declaration"):
-        for guard in edge.find_data("provided_attribute"):
+    edges_and_locations = list(tree.find_data("edge_declaration"))
+    edges_and_locations.extend(tree.find_data("location_declaration"))
+
+    for edge_or_location in edges_and_locations:
+        if (edge_or_location.data == "edge_declaration"):
+            constraints = edge_or_location.find_data("provided_attribute")
+        else:
+            constraints = edge_or_location.find_data("invariant_attribute")
+
+        for constraint in constraints:
             
-            atomic_expressions = list(guard.find_data("predicate_expr"))
-            atomic_expressions.extend(guard.find_data("clock_expr"))
+            atomic_expressions = list(constraint.find_data("predicate_expr"))
+            atomic_expressions.extend(constraint.find_data("clock_expr"))
             clock_expressions = filter(lambda e: AST_tools.is_clock_expr(tree, e), atomic_expressions)
 
             for expr in clock_expressions:
 
-                altered_expr = get_altered_expr_node(expr)
-                altered_guard = AST_tools.exchange_node(guard, expr, altered_expr)
-                altered_edge = AST_tools.exchange_node(edge, guard, altered_guard)
+                # check whether first or second compared value is constant
+                for clock_declaration in tree.find_data("clock_declaration"):
+                    if(AST_tools.contains_child_node(expr.children[0], clock_declaration.children[4])):
+                        old_constant_node = expr.children[2]
+                    elif(AST_tools.contains_child_node(expr.children[2], clock_declaration.children[4])):
+                        old_constant_node = expr.children[0]
 
-                mutations.append(AST_tools.exchange_node(tree, edge, altered_edge))
+                # define new constant node
+                op_node = Tree(Token('RULE', 'op'), [Token('OP_SUB_TOK', '-')]) if decrease_constant else Tree(Token('RULE', 'op'), [Token('OP_ADD_TOK', '+')])
+                one_node = Tree(Token('RULE', 'int_term'), [Token('SIGNED_INT', value)])
+                new_constant_node = Tree(Token('RULE', 'int_term'), [old_constant_node, op_node, one_node])
 
-    # change invariants
-    for location in tree.find_data("location_declaration"):
-        for invariant in location.find_data("invariant_attribute"):
+                # change node
+                altered_expr = AST_tools.exchange_node(expr, old_constant_node, new_constant_node)
+                altered_constraint = AST_tools.exchange_node(constraint, expr, altered_expr)
+                altered_edge_or_location = AST_tools.exchange_node(edge_or_location, constraint, altered_constraint)
 
-            atomic_expressions = list(invariant.find_data("predicate_expr"))
-            atomic_expressions.extend(invariant.find_data("clock_expr"))
-            clock_expressions = filter(lambda e: AST_tools.is_clock_expr(tree, e), atomic_expressions)
-
-            for expr in clock_expressions:
-
-                altered_expr = get_altered_expr_node(expr)
-                altered_invariant = AST_tools.exchange_node(invariant, expr, altered_expr)
-                altered_location = AST_tools.exchange_node(location, invariant, altered_invariant)
-
-                mutations.append(AST_tools.exchange_node(tree, location, altered_location))
+                mutations.append(AST_tools.exchange_node(tree, edge_or_location, altered_edge_or_location))
 
     return mutations
 
@@ -213,7 +211,7 @@ def invert_reset(tree: ParseTree) -> list[ParseTree]:
                                                [Token('SIGNED_INT', '0')])])])])
             colon = Token('COLON_TOK', ':')
 
-            # construct new edge
+            # define new edge
             altered_edge = copy.deepcopy(edge)
             assert(isinstance(altered_edge.children[9], Tree))
             # add colon after new reset if attributes list was nonempty before
@@ -271,7 +269,7 @@ def flip_urgent_or_committed_location(tree: ParseTree, flip_committed: bool) -> 
 
         colon = Token('COLON_TOK', ':')
 
-        # construct new location
+        # define new location
         altered_location = copy.deepcopy(location)
         assert(isinstance(altered_location.children[5], Tree))
         # add colon after new attribute if attributes list was nonempty before
@@ -312,7 +310,7 @@ def negate_guard(tree: ParseTree) -> list[ParseTree]:
             is_single_int_term = lambda e: isinstance(e, Tree) and 0 == len(list(e.scan_values(lambda t: t in cmps)))
             single_int_terms = filter(is_single_int_term, guard.children[2].children)
             
-            # construct non-negated part of guard with int term expressions and single int terms
+            # define non-negated part of guard with int term expressions and single int terms
             int_term_part_of_guard = []
             for int_term in int_term_expressions:
                 int_term_part_of_guard.append(Token('LOGICAL_AND_TOK', '&&'))
@@ -347,7 +345,7 @@ def negate_guard(tree: ParseTree) -> list[ParseTree]:
                 all_atomic_expressions.append(Tree(Token('RULE', 'atomic_expr'), [negate_expr(expr)]))
                 all_atomic_expressions.extend(int_term_part_of_guard)
                 
-                # construct new guard
+                # define new guard
                 new_guard = Tree(Token('RULE', 'provided_attribute'),
                                  [Token('PROVIDED_TOK', 'provided'),
                                   Token('COLON_TOK', ':'),
