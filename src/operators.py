@@ -560,3 +560,38 @@ def remove_sync(tree: ParseTree) -> list[ParseTree]:
         mutations.append(AST_tools.remove_node(tree, sync))
 
     return mutations
+
+def remove_sync_constraint(tree: ParseTree) -> list[ParseTree]:
+    """
+    Computes a list of mutations of the given TA such that for each mutation one sync constraint is removed from a synchronisation with more than one sync constraint.
+
+    :param tree: AST of TA to be mutated
+    :return: list of mutated ASTs
+    """
+
+    mutations = []
+
+    for sync in tree.find_data("sync_declaration"):
+
+        # only remove sync constraints from synchronisation if there are more than two
+        assert(isinstance(sync.children[2], Tree))
+        if(len(sync.children[2].children) > 3):
+            
+            # skip colons
+            for i in range(0, len(sync.children[2].children), 2):
+                altered_sync = copy.deepcopy(sync)
+                
+                # remove sync constraint
+                assert(isinstance(altered_sync.children[2], Tree))
+                altered_sync.children[2].children.pop(i)
+
+                # remove preceeding and succeeding colons if necessary
+                if(i == len(sync.children[2].children) - 1):
+                    altered_sync.children[2].children.pop(i - 1)
+                else: 
+                    altered_sync.children[2].children.pop(i)
+
+                # exchange node
+                mutations.append(AST_tools.exchange_node(copy.deepcopy(tree), sync, altered_sync))
+
+    return mutations

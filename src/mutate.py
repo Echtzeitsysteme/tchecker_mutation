@@ -85,6 +85,8 @@ def apply_mutation(ta_tree: lark.ParseTree, op: str, value: int) -> list[lark.Pa
             return operators.remove_transition(ta_tree)
         case "remove_sync":
             return operators.remove_sync(ta_tree)
+        case "remove_sync_constraint":
+            return operators.remove_sync_constraint(ta_tree)
         case _:
             raise ValueError("Unknown mutation operator.")
 
@@ -106,7 +108,8 @@ if "__main__" == __name__:
                   "change_transition_target", 
                   "remove_location", 
                   "remove_transition",
-                  "remove_sync"]
+                  "remove_sync",
+                  "remove_sync_constraint"]
 
     # input
     parser = argparse.ArgumentParser()
