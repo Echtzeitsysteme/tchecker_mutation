@@ -59,6 +59,8 @@ def apply_mutation(ta_tree: lark.ParseTree, op: str, value: int) -> list[lark.Pa
             return operators.change_event(ta_tree)
         case "change_constraint_cmp":
             return operators.change_constraint_cmp(ta_tree)
+        case "change_constraint_clock":
+            return operators.change_constraint_clock(ta_tree)
         case "decrease_constraint_constant":
             return operators.decrease_or_increase_constraint_constant(ta_tree, decrease_constant = True, value = value)
         case "increase_constraint_constant":
@@ -98,6 +100,7 @@ if "__main__" == __name__:
                   "all",
                   "change_event",
                   "change_constraint_cmp", 
+                  "change_constraint_clock", 
                   "decrease_constraint_constant",
                   "increase_constraint_constant",
                   "invert_committed_location",
@@ -169,12 +172,12 @@ if "__main__" == __name__:
     in_ta_tree = transformers.SimplifyExpressions().transform(in_ta_tree)
 
     def write_mutations(mutations: list[lark.ParseTree], op: str) -> None:
-        for i in range(len(mutations)):
+        for i, mutation in enumerate(mutations):
             out_file = os.path.join(out_dir, f"{in_ta[:-4]}_mutation_{op}_{i}.tck")
 
             # reconstructing TA text file from mutated AST
             reconstructor = lark.reconstruct.Reconstructor(ta_parser)
-            out_ta = reconstructor.reconstruct(mutations[i])
+            out_ta = reconstructor.reconstruct(mutation)
             open(out_file, "wt+").write(out_ta)
 
             # assert that output TA file does not contain syntax errors

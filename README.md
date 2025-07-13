@@ -23,6 +23,7 @@ $ python mutate.py --in_ta ad94.tck --out_dir out --op remove_location
 
 - `change_event`
 - `change_constraint_cmp`
+- `change_constraint_clock`
 - `decrease_constraint_constant`
 - `increase_constraint_constant`
 - `invert_committed_location`
