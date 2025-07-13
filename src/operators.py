@@ -154,7 +154,7 @@ def decrease_or_increase_constraint_constant(tree: ParseTree, decrease_constant:
 def invert_reset(tree: ParseTree) -> list[ParseTree]:
     """
     Computes a list of mutations of the given TA.
-    For each mutation, the occurrence of one clock in the set of reset clocks of one guard is flipped.
+    For each mutation, the occurrence of one clock in the set of reset clocks of one guard is flipped (added if non-existent, removed if existent).
     Only considers resets to 0.
 
     :param tree: AST of TA to be mutated
@@ -223,18 +223,18 @@ def invert_reset(tree: ParseTree) -> list[ParseTree]:
 
     return mutations
 
-def flip_urgent_or_committed_location(tree: ParseTree, flip_committed: bool) -> list[ParseTree]:
+def invert_urgent_or_committed_location(tree: ParseTree, invert_committed: bool) -> list[ParseTree]:
     """
     Computes a list of mutations of the given TA such that for each mutation the urgent or committed attribute of one location gets flipped (added if non-existent, removed if existent).
 
     :param tree: AST of TA to be mutated
-    :param flip_committed: Method turns location committed iff True, urgent otherwise.
+    :param invert_committed: Method turns location committed iff True, urgent otherwise.
     :return: list of mutated ASTs
     """
 
     mutations = []
 
-    if(flip_committed):
+    if(invert_committed):
         attribute = Tree(Token('RULE', 'committed_attribute'),
                          [Token('COMMITTED_TOK', 'committed'), Token('COLON_TOK', ':')])
     else:
@@ -543,7 +543,38 @@ def remove_transition(tree: ParseTree) -> list[ParseTree]:
 
     return mutations
 
-# sync changing operators
+# synchronisation changing operators
+
+def invert_sync_weakness(tree: ParseTree) -> list[ParseTree]:
+    """
+    Computes a list of mutations of the given TA such that for each mutation the weakness of one sync constraint is flipped (added if non-existent, removed if existent).
+
+    :param tree: AST of TA to be mutated
+    :return: list of mutated ASTs
+    """
+
+    mutations = []
+
+    for sync in tree.find_data("sync_declaration"):
+        
+        # skip colons
+        assert(isinstance(sync.children[2], Tree))
+        for i in range(0, len(sync.children[2].children), 2):
+            altered_sync = copy.deepcopy(sync)
+            weakness_op = Token('QUESTION_MARK_TOK', '?')
+
+            # remove or add weakness operator
+            assert(isinstance(altered_sync.children[2], Tree))
+            assert(isinstance(altered_sync.children[2].children[i], Tree))
+            if(3 == len(altered_sync.children[2].children[i].children)): # type: ignore
+                altered_sync.children[2].children[i].children.append(weakness_op) # type: ignore
+            else: 
+                 altered_sync.children[2].children[i].children.pop(3) # type: ignore
+
+            # exchange node
+            mutations.append(AST_tools.exchange_node(copy.deepcopy(tree), sync, altered_sync))
+
+    return mutations
 
 def remove_sync(tree: ParseTree) -> list[ParseTree]:
     """

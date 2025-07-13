@@ -63,12 +63,12 @@ def apply_mutation(ta_tree: lark.ParseTree, op: str, value: int) -> list[lark.Pa
             return operators.decrease_or_increase_constraint_constant(ta_tree, decrease_constant = True, value = value)
         case "increase_constraint_constant":
             return operators.decrease_or_increase_constraint_constant(ta_tree, decrease_constant = False, value = value)
+        case "invert_committed_location":
+            return operators.invert_urgent_or_committed_location(ta_tree, invert_committed = True)
         case "invert_reset":
             return operators.invert_reset(ta_tree)
-        case "flip_committed_location":
-            return operators.flip_urgent_or_committed_location(ta_tree, flip_committed = True)
-        case "flip_urgent_location":
-            return operators.flip_urgent_or_committed_location(ta_tree, flip_committed = False)
+        case "invert_urgent_location":
+            return operators.invert_urgent_or_committed_location(ta_tree, invert_committed = False)
         case "negate_guard":
             return operators.negate_guard(ta_tree)
         case "add_location":
@@ -83,6 +83,8 @@ def apply_mutation(ta_tree: lark.ParseTree, op: str, value: int) -> list[lark.Pa
             return operators.remove_location(ta_tree)
         case "remove_transition":
             return operators.remove_transition(ta_tree)
+        case "invert_sync_weakness":
+            return operators.invert_sync_weakness(ta_tree)
         case "remove_sync":
             return operators.remove_sync(ta_tree)
         case "remove_sync_constraint":
@@ -98,9 +100,9 @@ if "__main__" == __name__:
                   "change_constraint_cmp", 
                   "decrease_constraint_constant",
                   "increase_constraint_constant",
+                  "invert_committed_location",
                   "invert_reset",
-                  "flip_committed_location",
-                  "flip_urgent_location",
+                  "invert_urgent_location",
                   "negate_guard",
                   "add_location", 
                   "add_transition", 
@@ -108,6 +110,7 @@ if "__main__" == __name__:
                   "change_transition_target", 
                   "remove_location", 
                   "remove_transition",
+                  "invert_sync_weakness",
                   "remove_sync",
                   "remove_sync_constraint"]
 

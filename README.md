@@ -6,13 +6,44 @@ For a given TA, every possible mutation is generated with the specified operator
 ## Usage:
 
 ```
-$ python mutate.py --in_ta <input_tchecker_file> --out_dir <output_directory> --op <no_op | all | change_event | change_constraint_cmp | decrease_constraint_constant | increase_constraint_constant | invert_reset | flip_committed_location | flip_urgent_location | negate_guard | add_location | add_transition | change_transition_source | change_transition_target | remove_location | remove_transition | remove_sync | remove_sync_constraint> [--val <int>]
+$ python mutate.py --in_ta <input_tchecker_file> --out_dir <output_directory> --op <operator> [--val <int>]
 ```
 
 For example:
 ```
 $ python mutate.py --in_ta ad94.tck --out_dir out --op remove_location
 ```
+
+## Operator options:
+
+- `no_op`
+- `all`
+
+### Attribute changing:
+
+- `change_event`
+- `change_constraint_cmp`
+- `decrease_constraint_constant`
+- `increase_constraint_constant`
+- `invert_committed_location`
+- `invert_reset`
+- `invert_urgent_location`
+- `negate_guard`
+
+### Structure changing:
+
+- `add_location`
+- `add_transition`
+- `change_transition_source`
+- `change_transition_target`
+- `remove_location`
+- `remove_transition`
+
+### Synchronisation changing:
+
+- `invert_sync_weakness`
+- `remove_sync`
+- `remove_sync_constraint`
 
 ## Some Notes:
 
