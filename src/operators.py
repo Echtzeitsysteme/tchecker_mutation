@@ -542,3 +542,21 @@ def remove_transition(tree: ParseTree) -> list[ParseTree]:
         mutations.append(AST_tools.remove_node(tree, edge))
 
     return mutations
+
+# sync changing operators
+
+def remove_sync(tree: ParseTree) -> list[ParseTree]:
+    """
+    Computes a list of mutations of the given TA such that for each mutation one synchronisation is removed.
+
+    :param tree: AST of TA to be mutated
+    :return: list of mutated ASTs
+    """
+
+    mutations = []
+
+    for sync in tree.find_data("sync_declaration"):
+        # remove sync
+        mutations.append(AST_tools.remove_node(tree, sync))
+
+    return mutations

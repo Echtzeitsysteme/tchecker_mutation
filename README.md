@@ -6,7 +6,7 @@ For a given TA, every possible mutation is generated with the specified operator
 ## Usage:
 
 ```
-$ python mutate.py --in_ta <input_tchecker_file> --out_dir <output_directory> --op <no_op | all | change_event | change_guard_cmp | decrease_constraint_constant | increase_constraint_constant | invert_reset | make_location_committed | make_location_urgent | add_location | add_transition | change_transition_source | change_transition_target | remove_location | remove_transition> [--val <int>]
+$ python mutate.py --in_ta <input_tchecker_file> --out_dir <output_directory> --op <no_op | all | change_event | change_constraint_cmp | decrease_constraint_constant | increase_constraint_constant | invert_reset | flip_committed_location | flip_urgent_location | negate_guard | add_location | add_transition | change_transition_source | change_transition_target | remove_location | remove_transition | remove_sync> [--val <int>]
 ```
 
 For example:
