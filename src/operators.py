@@ -36,18 +36,14 @@ def change_event(tree: ParseTree) -> list[ParseTree]:
 
     mutations = []
 
-    # find events
-    events = []
-    for event in tree.find_data("event_declaration"):
-        events.append(event.children[2])
-
     for edge in tree.find_data("edge_declaration"):
-        # find suitable new events
+        
         old_event = edge.children[8]
-        new_event_options = events.copy()
-        new_event_options.remove(old_event)
 
-        for event in new_event_options:
+        for event in [event.children[2] for event in tree.find_data("event_declaration")]:
+            # skip mutation if new event is old event
+            if (event == old_event):
+                continue
             # exchange event
             altered_edge = AST_tools.exchange_node(edge, old_event, event)
             # exchange transition
@@ -462,10 +458,7 @@ def add_transition(tree: ParseTree) -> list[ParseTree]:
         process_id = process.children[2]
 
         # choose source and target location belonging to same process
-        locations = []
-        for location in tree.find_data("location_declaration"):
-            if(location.children[2] == process_id):
-                locations.append(location.children[4]) 
+        locations = [location.children[4] for location in tree.find_data("location_declaration") if location.children[2] == process_id]
 
         for source_location in locations:
             for target_location in locations:
@@ -512,10 +505,7 @@ def change_transition_source_or_target(tree: ParseTree, change_source: bool) -> 
         occurrence = 2 if not change_source and source_location_id == target_location_id else 1
 
         # find new source or target location
-        new_location_options = []
-        for location in tree.find_data("location_declaration"):
-            if(location.children[2] == process_id):
-                new_location_options.append(location.children[4])
+        new_location_options = [location.children[4] for location in tree.find_data("location_declaration") if location.children[2] == process_id]
         new_location_options.remove(old_location)
             
         for location in new_location_options:
@@ -538,19 +528,14 @@ def remove_location(tree: ParseTree) -> list[ParseTree]:
     # find non-initial locations
     locations = list(tree.find_data("location_declaration"))
     initial_attribute = next(tree.find_data("initial_attribute"))
-    for location in locations:
-        if AST_tools.contains_child_node(location, initial_attribute):
-            locations.remove(location)
+    locations = [location for location in locations if not AST_tools.contains_child_node(location, initial_attribute)]
 
     for location in locations:
         process_id = location.children[2]
         location_id = location.children[4]
 
         # find all transitions going into or out of location
-        edges_to_be_removed = []
-        for edge in tree.find_data("edge_declaration"):
-            if(edge.children[2] == process_id and (edge.children[4] == location_id or edge.children[6] == location_id)):
-                edges_to_be_removed.append(edge)
+        edges_to_be_removed = [edge for edge in tree.find_data("edge_declaration") if edge.children[2] == process_id and (edge.children[4] == location_id or edge.children[6] == location_id)]
 
         # remove location and transitions belonging to it
         mutation = AST_tools.remove_node(tree, location)
@@ -577,6 +562,36 @@ def remove_transition(tree: ParseTree) -> list[ParseTree]:
     return mutations
 
 # synchronisation changing operators
+
+def change_sync_event(tree: ParseTree) -> list[ParseTree]:
+    """
+    Computes a list of mutations of the given TA such that for each mutation one event in one synchronisation is changed.
+
+    :param tree: AST of TA to be mutated
+    :return: list of mutated ASTs
+    """
+
+    mutations = []
+
+    for sync in tree.find_data("sync_declaration"):
+
+        assert(isinstance(sync.children[2], Tree))
+        for sync_constraint in sync.find_data("sync_constraint"):
+            
+            assert(isinstance(sync_constraint, Tree))
+            old_event = sync_constraint.children[2]
+
+            for event in [event.children[2] for event in tree.find_data("event_declaration")]:
+                # skip mutation if new event is old event
+                if (event == old_event):
+                    continue
+                # exchange event
+                altered_sync_constraint = AST_tools.exchange_node(sync_constraint, old_event, event)
+                altered_sync = AST_tools.exchange_node(sync, sync_constraint, altered_sync_constraint)
+                # exchange synchronisation
+                mutations.append(AST_tools.exchange_node(tree, sync, altered_sync))
+
+    return mutations
 
 def invert_sync_weakness(tree: ParseTree) -> list[ParseTree]:
     """
