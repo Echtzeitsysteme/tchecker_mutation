@@ -6,6 +6,8 @@ import os.path
 import lark
 import lark.reconstruct
 import copy
+import csv
+# import random
 
 # studs
 
@@ -39,6 +41,7 @@ def check_bisimilarity(first: str, second: str) -> bool:
     :param second: .txt or .tck file of second TA
     :return: true iff given TA are bisimilar
     """ 
+    # return random.choice([True, False])
     return False
 
 def apply_mutation(ta_tree: lark.ParseTree, op: str, value: int) -> list[lark.ParseTree]:
@@ -166,19 +169,34 @@ if "__main__" == __name__:
     # parsing input TA text file to AST
     ta_parser = lark.Lark.open("parsing/grammar.lark", __file__)
     ta_parser.options.maybe_placeholders = False
-    in_ta_tree = ta_parser.parse(open(in_ta).read())
+    with open(in_ta) as file:
+        in_ta_tree = ta_parser.parse(file.read())
 
     # simplifying complex expressions in AST
     in_ta_tree = transformers.SimplifyExpressions().transform(in_ta_tree)
 
+    # create folder for bisimilar mutations
+    bisimilar_mutations_folder = os.path.join(out_dir, "bisimilar_mutations")
+    if not os.path.isdir(bisimilar_mutations_folder):
+        os.makedirs(bisimilar_mutations_folder)
+
+    # create log file for bisimilar mutations
+    bisimilarity_log_file = open(os.path.join(bisimilar_mutations_folder, "bisimilarity_log.csv"), mode='w+', newline='')
+    csv_writer = csv.writer(bisimilarity_log_file)
+    csv_writer.writerow(["mutation", "result of bisimilarity check"])
+
     def write_mutations(mutations: list[lark.ParseTree], op: str) -> None:
         for i, mutation in enumerate(mutations):
-            out_file = os.path.join(out_dir, f"{in_ta[:-4]}_mutation_{op}_{i}.tck")
+
+            file_name = f"{in_ta[:-4]}_mutation_{op}_{i}.tck"
+            out_file = os.path.join(out_dir, file_name)
 
             # reconstructing TA text file from mutated AST
             reconstructor = lark.reconstruct.Reconstructor(ta_parser)
             out_ta = reconstructor.reconstruct(mutation)
-            open(out_file, "wt+").write(out_ta)
+            
+            with open(out_file, "w") as file:
+                file.write(out_ta)
 
             # assert that output TA file does not contain syntax errors
             assert(check_syntax(out_file))
@@ -189,9 +207,15 @@ if "__main__" == __name__:
             except:
                 os.remove(out_file)
 
-            # delete mutation if it is bisimilar to original
-            if(check_bisimilarity(in_ta, out_file)):
-                os.remove(out_file)
+            # check whether mutation is bisimilar to original
+            is_bisimilar_to_original = check_bisimilarity(in_ta, out_file)
+
+            # log bisimilarity of mutation
+            csv_writer.writerow([file_name, is_bisimilar_to_original])
+
+            # move mutation into seperate folder if it is bisimilar
+            if(is_bisimilar_to_original):
+                os.replace(out_file, os.path.join(bisimilar_mutations_folder, file_name))
 
     # compute mutations
     if (op == "all"):
@@ -207,7 +231,4 @@ if "__main__" == __name__:
         mutations = apply_mutation(copy.deepcopy(in_ta_tree), op, value)
         write_mutations(mutations, op)
 
-    
-
-        
-    
+    bisimilarity_log_file.close()

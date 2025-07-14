@@ -1,7 +1,9 @@
 # tchecker_mutation
 
-This program generates mutations of a TA.
-For a given TA, every possible mutation is generated with the specified operator and printed as a .tck file in the specified output directory.
+This program generates mutations of a TA.\
+For a given TA, every possible mutation is generated with the specified operator and written as a .tck file in the specified output directory.\
+Mutations that are bisimilar to the original TA are written to a seperate directory `bisimilar_mutations` inside the output directory.\
+Whether a mutation is bisimilar or not is logged in `bisimilarity_log.csv` in `bisimilar_mutations`.
 
 ## Usage:
 
