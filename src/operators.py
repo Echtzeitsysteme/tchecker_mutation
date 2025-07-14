@@ -563,6 +563,57 @@ def remove_transition(tree: ParseTree) -> list[ParseTree]:
 
 # synchronisation changing operators
 
+def add_sync(tree: ParseTree) -> list[ParseTree]:
+    """
+    Computes a list of mutations of the given TA such that for each mutation one synchronisation consisting of two constraints is added.
+
+    :param tree: AST of TA to be mutated
+    :return: list of mutated ASTs
+    """
+
+    mutations = []
+
+    # define new sync_constraints
+    sync_constraints = []
+    for process in [process.children[2] for process in tree.find_data("process_declaration")]:
+        for event in [event.children[2] for event in tree.find_data("event_declaration")]:
+            new_sync_constraint = Tree(Token('RULE', 'sync_constraint'), 
+                                       [process, Token('AT_TOK', '@'), event])
+            sync_constraints.append(new_sync_constraint)
+
+    sync_constraint_partners = sync_constraints.copy()
+
+    for sync_constraint in sync_constraints:
+
+        # avoid having two synchronisations with same sync constraints in different order
+        sync_constraint_partners.remove(sync_constraint)
+
+        for sync_constraint_partner in sync_constraint_partners:
+
+            # skip mutation if synchronisation synchronises same process twice
+            if(sync_constraint.children[0] == sync_constraint_partner.children[0]):
+                continue
+
+            mutation = copy.deepcopy(tree)
+
+            # define new sync declaration
+            new_sync_declaration = Tree(Token('RULE', 'sync_declaration'), 
+                                        [Token('SYNC_TOK', 'sync'), 
+                                         Token('COLON_TOK', ':'), 
+                                         Tree(Token('RULE', 'sync_constraints'), 
+                                              [sync_constraint, 
+                                               Token('COLON_TOK', ':'), 
+                                               sync_constraint_partner])])
+            
+            # skip mutation if original TA already constains this exact sync declaration
+            if(AST_tools.contains_child_node(tree, new_sync_declaration)):
+                continue
+            
+            mutation.children.append(new_sync_declaration)
+            mutations.append(mutation)
+
+    return mutations
+
 def change_sync_event(tree: ParseTree) -> list[ParseTree]:
     """
     Computes a list of mutations of the given TA such that for each mutation one event in one synchronisation is changed.

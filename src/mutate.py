@@ -88,6 +88,8 @@ def apply_mutation(ta_tree: lark.ParseTree, op: str, value: int) -> list[lark.Pa
             return operators.remove_location(ta_tree)
         case "remove_transition":
             return operators.remove_transition(ta_tree)
+        case "add_sync":
+            return operators.add_sync(ta_tree)
         case "change_sync_event":
             return operators.change_sync_event(ta_tree)
         case "invert_sync_weakness":
@@ -118,6 +120,7 @@ if "__main__" == __name__:
                   "change_transition_target", 
                   "remove_location", 
                   "remove_transition",
+                  "add_sync",
                   "change_sync_event",
                   "invert_sync_weakness",
                   "remove_sync",

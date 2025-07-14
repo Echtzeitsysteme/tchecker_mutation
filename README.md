@@ -44,6 +44,7 @@ $ python mutate.py --in_ta ad94.tck --out_dir out --op remove_location
 
 ### Synchronisation changing:
 
+- `add_sync`
 - `change_sync_event`
 - `invert_sync_weakness`
 - `remove_sync`
