@@ -360,20 +360,20 @@ def negate_guard(tree: ParseTree) -> list[ParseTree]:
 
                     match old_cmp:
                         case "<=":
-                            return AST_tools.exchange_node(expr, cmp_tokens[old_cmp], Token("CMP_GEQ_TOK", ">"))
+                            return Tree(Token('RULE', 'atomic_expr'), [AST_tools.exchange_node(expr, cmp_tokens[old_cmp], Token("CMP_GEQ_TOK", ">"))])
                         case "<":
-                            return AST_tools.exchange_node(expr, cmp_tokens[old_cmp], Token("CMP_GEQ_TOK", ">="))
+                            return Tree(Token('RULE', 'atomic_expr'), [AST_tools.exchange_node(expr, cmp_tokens[old_cmp], Token("CMP_GEQ_TOK", ">="))])
                         case ">=":
-                            return AST_tools.exchange_node(expr, cmp_tokens[old_cmp], Token("CMP_GEQ_TOK", "<"))
+                            return Tree(Token('RULE', 'atomic_expr'), [AST_tools.exchange_node(expr, cmp_tokens[old_cmp], Token("CMP_GEQ_TOK", "<"))])
                         case ">":
-                            return AST_tools.exchange_node(expr, cmp_tokens[old_cmp], Token("CMP_GEQ_TOK", "<="))
+                            return Tree(Token('RULE', 'atomic_expr'), [AST_tools.exchange_node(expr, cmp_tokens[old_cmp], Token("CMP_GEQ_TOK", "<="))])
                         # there should be no equals comparators left after transformation
                         case _: 
                             raise ValueError(f"Unknown cmp {old_cmp}")
                 
                 # concatenate negated and non-negated part of guard
                 all_atomic_expressions = []
-                all_atomic_expressions.append(Tree(Token('RULE', 'atomic_expr'), [negate_expr(expr)]))
+                all_atomic_expressions.append(negate_expr(expr))
                 all_atomic_expressions.extend(int_term_part_of_guard)
                 
                 # define new guard
@@ -385,7 +385,7 @@ def negate_guard(tree: ParseTree) -> list[ParseTree]:
                 # exchange node                
                 new_edge = AST_tools.exchange_node(edge, guard, new_guard)
                 mutation.children.append(Token('NEWLINE_TOK', '\n\n'))
-                mutation.children.append(new_edge)      
+                mutation.children.append(new_edge)
             
             mutations.append(mutation)
 
@@ -575,44 +575,55 @@ def add_sync(tree: ParseTree) -> list[ParseTree]:
 
     mutations = []
 
-    # define new sync_constraints
+    # find every possible sync_constraints
+    processes = [process.children[2] for process in tree.find_data("process_declaration")]
+
+    # find every possible sync_constraints
     sync_constraints = []
-    for process in [process.children[2] for process in tree.find_data("process_declaration")]:
+    for process in processes:
         for event in [event.children[2] for event in tree.find_data("event_declaration")]:
             new_sync_constraint = Tree(Token('RULE', 'sync_constraint'), 
                                        [process, Token('AT_TOK', '@'), event])
             sync_constraints.append(new_sync_constraint)
 
-    sync_constraint_partners = sync_constraints.copy()
+    while(len(processes) > 0):
 
-    for sync_constraint in sync_constraints:
+        process = processes.pop(0)
+        # get all sync constraints containing process
+        sync_constraints_for_process = [sync_constraint for sync_constraint in sync_constraints if sync_constraint.children[0] == process]
 
-        # avoid having two synchronisations with same sync constraints in different order
-        sync_constraint_partners.remove(sync_constraint)
+        def add_sync_helper(sync_constraints_already_in_declaration: list[Tree | Token], remaining_processes: list[Tree | Token]) -> None:
 
-        for sync_constraint_partner in sync_constraint_partners:
+            remaining_processes = copy.deepcopy(remaining_processes)
+            while(len(remaining_processes) > 0):
 
-            # skip mutation if synchronisation synchronises same process twice
-            if(sync_constraint.children[0] == sync_constraint_partner.children[0]):
-                continue
+                process = remaining_processes.pop(0)
+                # get all sync constraints containing process
+                sync_constraints_for_process = [sync_constraint for sync_constraint in sync_constraints if sync_constraint.children[0] == process]
 
-            mutation = copy.deepcopy(tree)
+                for new_sync_constraint in sync_constraints_for_process:
 
-            # define new sync declaration
-            new_sync_declaration = Tree(Token('RULE', 'sync_declaration'), 
-                                        [Token('SYNC_TOK', 'sync'), 
-                                         Token('COLON_TOK', ':'), 
-                                         Tree(Token('RULE', 'sync_constraints'), 
-                                              [sync_constraint, 
-                                               Token('COLON_TOK', ':'), 
-                                               sync_constraint_partner])])
-            
-            # skip mutation if original TA already constains this exact sync declaration
-            if(AST_tools.contains_child_node(tree, new_sync_declaration)):
-                continue
-            
-            mutation.children.append(new_sync_declaration)
-            mutations.append(mutation)
+                    mutation = copy.deepcopy(tree)
+
+                    # add new sync constraint
+                    new_sync_constraints = sync_constraints_already_in_declaration + [Token('COLON_TOK', ':'), new_sync_constraint]
+                    # define new sync declaration
+                    new_sync_declaration = Tree(Token('RULE', 'sync_declaration'), 
+                                                [Token('SYNC_TOK', 'sync'), 
+                                                Token('COLON_TOK', ':'), 
+                                                Tree(Token('RULE', 'sync_constraints'), 
+                                                    new_sync_constraints)])
+                    
+                    # skip mutation if original TA already constains this exact sync declaration
+                    if(not AST_tools.contains_child_node(tree, new_sync_declaration)):
+                        # add new sync declaration
+                        mutation.children.append(new_sync_declaration)
+                        mutations.append(mutation)
+                    
+                    add_sync_helper(new_sync_constraints, remaining_processes)
+
+        for sync_constraint in sync_constraints_for_process:
+            add_sync_helper([sync_constraint], processes)
 
     return mutations
 

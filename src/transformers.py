@@ -126,4 +126,4 @@ class combineGuards(Transformer):
             # remove guard
             result.children[9].children.pop(idx - 1)
 
-        return AST_tools.exchange_node(result, old_guard, new_guard)
+        return AST_tools.exchange_node(result, old_guard, new_guard) # type: ignore

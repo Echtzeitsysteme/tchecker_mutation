@@ -4,7 +4,7 @@ from lark import ParseTree, Token, Tree
 
 # helper functions
 
-def exchange_node(tree: ParseTree, old_node: ParseTree | Token, new_node: ParseTree | Token, occurrence_in_child_list: int = 1) -> ParseTree:
+def exchange_node(tree: ParseTree, old_node: ParseTree | Token, new_node: ParseTree | Token, occurrence_in_child_list: int = 1) -> ParseTree | Token:
     """
     Exchanges old_node in given tree with new_node. 
     By default, this method only exchanges the first occurrence of old_node in each node's child list.
@@ -16,6 +16,9 @@ def exchange_node(tree: ParseTree, old_node: ParseTree | Token, new_node: ParseT
                                      For example, if occurrence_in_child_list == 2, only the second occurrence of the node in each child list is exchanged.
     :return: tree with old_node exchanged with new_node
     """
+
+    if(tree == old_node):
+        return new_node
 
     if(not contains_child_node(tree, old_node)):
         raise ValueError("Tree does not contain node to be exchanged.")
