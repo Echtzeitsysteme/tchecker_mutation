@@ -12,7 +12,7 @@ def no_op(tree: ParseTree) -> list[ParseTree]:
     """
     print(tree.pretty())
     print(tree)
-    return [tree]
+    return [transformers.combineGuards().transform(tree)]
 
 # attribute changing operators
 
@@ -278,7 +278,7 @@ def invert_urgent_or_committed_location(tree: ParseTree, invert_committed: bool)
             assert(isinstance(altered_location.children[5], Tree))
             idx = altered_location.children[5].children.index(attribute)
 
-            # remove preceeding and succeeding colons if necessary
+            # remove preceding and succeeding colons if necessary
             if(idx > 1):
                 altered_location.children[5].children.pop(idx - 1)
                 idx = idx - 1
@@ -320,6 +320,8 @@ def negate_guard(tree: ParseTree) -> list[ParseTree]:
 
     # transform equals comparator before negation since neq comparator is not allowed in clock expressions
     transformed_tree = transformers.BreakUpEquals().transform(copy.deepcopy(tree))
+    # combine multiple guards of one transition into one guard
+    transformed_tree = transformers.combineGuards().transform(transformed_tree)
 
     mutations = []
 
@@ -714,7 +716,7 @@ def remove_sync_constraint(tree: ParseTree) -> list[ParseTree]:
                 assert(isinstance(altered_sync.children[2], Tree))
                 altered_sync.children[2].children.pop(i)
 
-                # remove preceeding and succeeding colons if necessary
+                # remove preceding and succeeding colons if necessary
                 if(i == len(sync.children[2].children) - 1):
                     altered_sync.children[2].children.pop(i - 1)
                 else: 

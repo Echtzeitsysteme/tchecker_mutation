@@ -99,4 +99,31 @@ class BreakUpEquals(Transformer):
                 i += 1
 
         return result
-    
+
+class combineGuards(Transformer):
+    """
+    Combines multiple guards of one transition into one by conjuction (in case one edge has more than one provided attribute).
+    """
+
+    @lark.visitors.v_args(tree=True)
+    def edge_declaration(self, tree: ParseTree) -> ParseTree:
+
+        result = copy.deepcopy(tree)
+
+        guards = list(tree.find_data("provided_attribute"))
+        old_guard = guards.pop(0)
+        new_guard = copy.deepcopy(old_guard)
+
+        for guard in guards:
+            assert(isinstance(new_guard.children[2], Tree))
+            new_guard.children[2].children.append(Token('LOGICAL_AND_TOK', '&&'))
+            assert(isinstance(guard.children[2], Tree))
+            new_guard.children[2].children.extend(guard.children[2].children)
+            assert(isinstance(result.children[9], Tree))
+            idx = result.children[9].children.index(guard)
+            # remove preceding colon
+            result.children[9].children.pop(idx - 1)
+            # remove guard
+            result.children[9].children.pop(idx - 1)
+
+        return AST_tools.exchange_node(result, old_guard, new_guard)
