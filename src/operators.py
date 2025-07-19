@@ -567,7 +567,8 @@ def remove_transition(tree: ParseTree) -> list[ParseTree]:
 
 def add_sync(tree: ParseTree) -> list[ParseTree]:
     """
-    Computes a list of mutations of the given TA such that for each mutation one synchronisation consisting of two constraints is added.
+    Computes a list of mutations of the given TA such that for each mutation one synchronisation is added.
+    Number of sync constraints in one synchronistion is at least two and at most the number of processes in the TA.
 
     :param tree: AST of TA to be mutated
     :return: list of mutated ASTs
@@ -575,10 +576,10 @@ def add_sync(tree: ParseTree) -> list[ParseTree]:
 
     mutations = []
 
-    # find every possible sync_constraints
+    # find every process
     processes = [process.children[2] for process in tree.find_data("process_declaration")]
 
-    # find every possible sync_constraints
+    # find every possible sync_constraint
     sync_constraints = []
     for process in processes:
         for event in [event.children[2] for event in tree.find_data("event_declaration")]:
@@ -624,6 +625,42 @@ def add_sync(tree: ParseTree) -> list[ParseTree]:
 
         for sync_constraint in sync_constraints_for_process:
             add_sync_helper([sync_constraint], processes)
+
+    return mutations
+
+def add_sync_constraint(tree: ParseTree) -> list[ParseTree]:
+    """
+    Computes a list of mutations of the given TA such that for each mutation one sync constraint is added to an already existing synchronisation.
+
+    :param tree: AST of TA to be mutated
+    :return: list of mutated ASTs
+    """
+
+    mutations = []
+
+    # find every possible sync_constraint
+    sync_constraints = []
+    for process in [process.children[2] for process in tree.find_data("process_declaration")]:
+        for event in [event.children[2] for event in tree.find_data("event_declaration")]:
+            new_sync_constraint = Tree(Token('RULE', 'sync_constraint'), 
+                                       [process, Token('AT_TOK', '@'), event])
+            sync_constraints.append(new_sync_constraint)
+
+    for sync in tree.find_data("sync_declaration"):
+
+        for sync_constraint in sync_constraints:
+
+            # skip sync constraint if its process is already appearing in sycnhronisation
+            if(AST_tools.contains_child_node(sync, sync_constraint.children[0])):
+                continue
+
+            new_sync = copy.deepcopy(sync)
+        
+            assert(isinstance(new_sync.children[2], Tree))
+            new_sync.children[2].children.append(Token('COLON_TOK', ':'))
+            new_sync.children[2].children.append(sync_constraint)
+
+            mutations.append(AST_tools.exchange_node(tree, sync, new_sync))
 
     return mutations
 
