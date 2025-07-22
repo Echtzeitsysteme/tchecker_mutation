@@ -111,19 +111,22 @@ class combineGuards(Transformer):
         result = copy.deepcopy(tree)
 
         guards = list(tree.find_data("provided_attribute"))
+
+        # keep edge untouched if it has no guard
+        if(len(guards) == 0):
+            return result
+        
         old_guard = guards.pop(0)
         new_guard = copy.deepcopy(old_guard)
 
         for guard in guards:
-            assert(isinstance(new_guard.children[2], Tree))
+            
             new_guard.children[2].children.append(Token('LOGICAL_AND_TOK', '&&'))
-            assert(isinstance(guard.children[2], Tree))
             new_guard.children[2].children.extend(guard.children[2].children)
-            assert(isinstance(result.children[9], Tree))
             idx = result.children[9].children.index(guard)
             # remove preceding colon
             result.children[9].children.pop(idx - 1)
             # remove guard
             result.children[9].children.pop(idx - 1)
 
-        return AST_tools.exchange_node(result, old_guard, new_guard) # type: ignore
+        return AST_tools.exchange_node(result, old_guard, new_guard) 

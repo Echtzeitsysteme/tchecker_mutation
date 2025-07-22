@@ -5,7 +5,6 @@ import argparse
 import os.path
 import lark
 import lark.reconstruct
-import copy
 import csv
 # import random
 
@@ -233,11 +232,11 @@ if "__main__" == __name__:
         ops.remove("all")
 
         for operator in ops:
-            mutations = apply_mutation(copy.deepcopy(in_ta_tree), operator, value)
+            mutations = apply_mutation(in_ta_tree, operator, value)
             write_mutations(mutations, operator)
 
     else:
-        mutations = apply_mutation(copy.deepcopy(in_ta_tree), op, value)
+        mutations = apply_mutation(in_ta_tree, op, value)
         write_mutations(mutations, op)
 
     bisimilarity_log_file.close()

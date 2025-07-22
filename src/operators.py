@@ -113,10 +113,10 @@ def change_constraint_clock(tree: ParseTree) -> list[ParseTree]:
                     def add_mutation_with_exchanged_clock(idx_in_expr: int, idx_in_term: int) -> None:
 
                         # skip mutation if element to exchange with clock is not a clock
-                        if(not AST_tools.is_clock_expr(tree, expr.children[idx_in_expr].children[idx_in_term])): # type: ignore
+                        if(not AST_tools.is_clock_expr(tree, expr.children[idx_in_expr].children[idx_in_term])): 
                             return
                         
-                        old_clock = expr.children[idx_in_expr].children[idx_in_term] # type: ignore
+                        old_clock = expr.children[idx_in_expr].children[idx_in_term] 
 
                         # also consider clocks of form x in addition to x[0]
                         is_same_clock_without_index = (isinstance(old_clock, Tree) and len(old_clock.children) == 1 and clock.children[0] == old_clock.children[0])
@@ -126,7 +126,7 @@ def change_constraint_clock(tree: ParseTree) -> list[ParseTree]:
 
                         # exchange clock
                         altered_expr = copy.deepcopy(expr)
-                        altered_expr.children[idx_in_expr].children[idx_in_term] = clock # type: ignore
+                        altered_expr.children[idx_in_expr].children[idx_in_term] = clock 
                         # exchange expression
                         altered_constraint = AST_tools.exchange_node(constraint, expr, altered_expr)
                         altered_edge_or_location = AST_tools.exchange_node(edge_or_location, constraint, altered_constraint)
@@ -137,11 +137,9 @@ def change_constraint_clock(tree: ParseTree) -> list[ParseTree]:
                     # exchange clock in right part of clock expression (if it is a clock)
                     add_mutation_with_exchanged_clock(2, 0)
                     # for expressions of form x - y == 0: exchange second element in left part of clock expression (if it is a clock)
-                    assert(isinstance(expr.children[0], Tree))
                     if(1 < len(expr.children[0].children)):
                         add_mutation_with_exchanged_clock(0, 2)
                     # for expressions of form 0 == x - y: exchange second element in right part of clock expression (if it is a clock)
-                    assert(isinstance(expr.children[2], Tree))
                     if(1 < len(expr.children[2].children)):
                         add_mutation_with_exchanged_clock(2, 2)
                     
@@ -242,7 +240,6 @@ def invert_reset(tree: ParseTree) -> list[ParseTree]:
 
             # define new edge
             altered_edge = copy.deepcopy(edge)
-            assert(isinstance(altered_edge.children[9], Tree))
             # add colon after new reset if attributes list was nonempty before
             if (altered_edge.children[9].children[1] != Token('RIGHT_BRACE_TOK', '}')):
                 altered_edge.children[9].children.insert(1, colon)
@@ -275,7 +272,6 @@ def invert_urgent_or_committed_location(tree: ParseTree, invert_committed: bool)
         if(AST_tools.contains_child_node(location, attribute)):
             altered_location = copy.deepcopy(location)
 
-            assert(isinstance(altered_location.children[5], Tree))
             idx = altered_location.children[5].children.index(attribute)
 
             # remove preceding and succeeding colons if necessary
@@ -300,7 +296,6 @@ def invert_urgent_or_committed_location(tree: ParseTree, invert_committed: bool)
 
         # define new location
         altered_location = copy.deepcopy(location)
-        assert(isinstance(altered_location.children[5], Tree))
         # add colon after new attribute if attributes list was nonempty before
         if (altered_location.children[5].children[1] != Token('RIGHT_BRACE_TOK', '}')):
             altered_location.children[5].children.insert(1, colon)
@@ -319,7 +314,7 @@ def negate_guard(tree: ParseTree) -> list[ParseTree]:
     """
 
     # transform equals comparator before negation since neq comparator is not allowed in clock expressions
-    transformed_tree = transformers.BreakUpEquals().transform(copy.deepcopy(tree))
+    transformed_tree = transformers.BreakUpEquals().transform(tree)
     # combine multiple guards of one transition into one guard
     transformed_tree = transformers.combineGuards().transform(transformed_tree)
 
@@ -655,8 +650,7 @@ def add_sync_constraint(tree: ParseTree) -> list[ParseTree]:
                 continue
 
             new_sync = copy.deepcopy(sync)
-        
-            assert(isinstance(new_sync.children[2], Tree))
+
             new_sync.children[2].children.append(Token('COLON_TOK', ':'))
             new_sync.children[2].children.append(sync_constraint)
 
@@ -676,10 +670,8 @@ def change_sync_event(tree: ParseTree) -> list[ParseTree]:
 
     for sync in tree.find_data("sync_declaration"):
 
-        assert(isinstance(sync.children[2], Tree))
         for sync_constraint in sync.find_data("sync_constraint"):
-            
-            assert(isinstance(sync_constraint, Tree))
+
             old_event = sync_constraint.children[2]
 
             for event in [event.children[2] for event in tree.find_data("event_declaration")]:
@@ -707,20 +699,18 @@ def invert_sync_weakness(tree: ParseTree) -> list[ParseTree]:
     for sync in tree.find_data("sync_declaration"):
         
         # skip colons
-        assert(isinstance(sync.children[2], Tree))
         for i in range(0, len(sync.children[2].children), 2):
             altered_sync = copy.deepcopy(sync)
             weakness_op = Token('QUESTION_MARK_TOK', '?')
 
             # remove or add weakness operator
-            assert(isinstance(altered_sync.children[2], Tree))
-            if(3 == len(altered_sync.children[2].children[i].children)): # type: ignore
-                altered_sync.children[2].children[i].children.append(weakness_op) # type: ignore
+            if(3 == len(altered_sync.children[2].children[i].children)): 
+                altered_sync.children[2].children[i].children.append(weakness_op) 
             else: 
-                altered_sync.children[2].children[i].children.pop(3) # type: ignore
+                altered_sync.children[2].children[i].children.pop(3) 
 
             # exchange node
-            mutations.append(AST_tools.exchange_node(copy.deepcopy(tree), sync, altered_sync))
+            mutations.append(AST_tools.exchange_node(tree, sync, altered_sync))
 
     return mutations
 
@@ -753,7 +743,6 @@ def remove_sync_constraint(tree: ParseTree) -> list[ParseTree]:
     for sync in tree.find_data("sync_declaration"):
 
         # only remove sync constraints from synchronisation if there are more than two
-        assert(isinstance(sync.children[2], Tree))
         if(len(sync.children[2].children) > 3):
             
             # skip colons
@@ -761,7 +750,6 @@ def remove_sync_constraint(tree: ParseTree) -> list[ParseTree]:
                 altered_sync = copy.deepcopy(sync)
                 
                 # remove sync constraint
-                assert(isinstance(altered_sync.children[2], Tree))
                 altered_sync.children[2].children.pop(i)
 
                 # remove preceding and succeeding colons if necessary
@@ -771,6 +759,6 @@ def remove_sync_constraint(tree: ParseTree) -> list[ParseTree]:
                     altered_sync.children[2].children.pop(i)
 
                 # exchange node
-                mutations.append(AST_tools.exchange_node(copy.deepcopy(tree), sync, altered_sync))
+                mutations.append(AST_tools.exchange_node(tree, sync, altered_sync))
 
     return mutations

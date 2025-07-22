@@ -1,7 +1,6 @@
-// minimal tree shaping to avoid interfering with reconstruction (this might be optimizable)
-
 // basic tokens
 id: /[a-zA-Z_$]([a-zA-Z0-9_.])*/
+value: /[^:@#}\n ]+/ // added } to forbidden characters to correctly parse end of attribute list (according to the tchecker file format, } would be allowed in attribute values)
 
 COLON_TOK: ":"
 LEFT_BRACE_TOK: "{"
@@ -66,7 +65,7 @@ _attribute: initial_attribute
          | custom_attribute
         //  | "layout" COLON_TOK SIGNED_INT "," SIGNED_INT
 
-custom_attribute: id COLON_TOK ESCAPED_STRING* // ?
+custom_attribute: id COLON_TOK value*
 
 initial_attribute: INITIAL_TOK COLON_TOK
 INITIAL_TOK: "initial"
@@ -171,7 +170,6 @@ COMMENT: "#" /[^\n]*/ NEWLINE
 
 %import common.SIGNED_INT
 %import common.INT
-%import common.ESCAPED_STRING
 %import common.WS_INLINE
 %import common.NEWLINE
 

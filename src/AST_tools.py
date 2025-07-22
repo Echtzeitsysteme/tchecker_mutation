@@ -140,7 +140,7 @@ def get_all_clocks(tree: ParseTree) -> list[ParseTree]:
     clocks = []
     for clock in tree.find_data("clock_declaration"):
         for i in range(int(str(clock.children[2]))):
-            clock_id = copy.deepcopy(clock.children[4])
+            clock_id = clock.children[4]
             clock_node = Tree(Token('RULE', 'int_or_clock_id'), 
                          [clock_id, Token('LEFT_BRACKET_TOK', '['),
                           Tree(Token('RULE', 'int_term'), [Token('SIGNED_INT', i)]), 
