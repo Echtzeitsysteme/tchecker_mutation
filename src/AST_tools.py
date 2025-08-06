@@ -4,96 +4,86 @@ from lark import ParseTree, Token, Tree
 
 # helper functions
 
-def exchange_node(tree: ParseTree, old_node: ParseTree | Token, new_node: ParseTree | Token, occurrence_in_child_list: int = 1) -> ParseTree | Token:
+def exchange_node(tree: ParseTree, old_node: ParseTree | Token, new_node: ParseTree | Token) -> ParseTree | Token:
     """
     Exchanges old_node in given tree with new_node. 
-    By default, this method only exchanges the first occurrence of old_node in each node's child list.
+    Only exchanges the first occurrence of old_node in the tree.
 
     :param tree: tree to be altered
     :param old_node: node to be exchanged
     :param new_node: node old_node is to be exchanged with
-    :param occurrence_in_child_list: If a node in the tree contains the old_node as a child multiple times, this parameter determines which one is exchanged. 
-                                     For example, if occurrence_in_child_list == 2, only the second occurrence of the node in each child list is exchanged.
     :return: tree with old_node exchanged with new_node
     """
 
+    if(not contains_child_node(tree, old_node)):
+        raise ValueError("Tree does not contain node to be exchanged.")
+    
     if(tree == old_node):
         return new_node
 
-    if(not contains_child_node(tree, old_node)):
-        raise ValueError("Tree does not contain node to be exchanged.")
-
-    def exchange_node_helper(tree: ParseTree, old_node, new_node, occurrence_in_child_list) -> ParseTree:
+    def exchange_node_helper(tree: ParseTree, old_node, new_node) -> ParseTree:
 
         # old_node is direct child node of tree
-        if(occurrence_in_child_list <= tree.children.count(old_node)):
-            occurrences_so_far = 0
-            for i in range(len(tree.children)):
-                if(tree.children[i] == old_node):
-                    occurrences_so_far += 1
-                    if(occurrences_so_far == occurrence_in_child_list):
-                        tree.children[i] = new_node
+        if(old_node in tree.children):
+            for i, child in enumerate(tree.children):
+                if(child == old_node):
+                    tree.children[i] = new_node
+                    break
 
         # given node is no direct child node of tree
         else:
             new_children = []
 
+            exchanged_node = False
             for child in tree.children:
-                if(isinstance(child, Token)):
+                if(exchanged_node or isinstance(child, Token) or not contains_child_node(child, old_node)):
                     new_children.append(child)
                 else:
-                    new_children.append(exchange_node_helper(child, old_node, new_node, occurrence_in_child_list))
+                    new_children.append(exchange_node_helper(child, old_node, new_node))
+                    exchanged_node = True
 
             tree.set(tree.data, new_children)
 
         return tree
 
-    return exchange_node_helper(copy.deepcopy(tree), old_node, new_node, occurrence_in_child_list)
+    return exchange_node_helper(copy.deepcopy(tree), old_node, new_node)
 
-def remove_node(tree: ParseTree, node: ParseTree | Token, occurrence_in_child_list: int = 1) -> ParseTree:
+def remove_node(tree: ParseTree, node: ParseTree | Token) -> ParseTree:
     """
     Removes given node from given tree. 
-    By default, this method only removes the first occurrence of the node in each node's child list.
+    Only removes the first occurrence of the node in the tree.
 
     :param tree: tree to be altered
     :param node: node to be removed
-    :param occurrence_in_child_list: If a node in the tree contains the given node as a child multiple times, this parameter determines which one is removed. 
-                                     For example, if occurrence_in_child_list == 2, the only second occurrence of the node in each child list is removed.
     :return: tree without given node
     """
 
     if(not contains_child_node(tree, node)):
         raise ValueError("Tree does not contain node to be removed.")
 
-    def remove_node_helper(tree: ParseTree, node, occurrence_in_child_list) -> ParseTree:
+    def remove_node_helper(tree: ParseTree, node) -> ParseTree:
 
         # given node is direct child node of tree
-        if(occurrence_in_child_list <= tree.children.count(node)):
-            occurrences_so_far = 0
-
-            for i, child in enumerate(tree.children):
-                if(child == node):
-                    occurrences_so_far += 1
-                    if(occurrences_so_far == occurrence_in_child_list):
-                        idx = i
-
-            tree.children.pop(idx)
+        if(node in tree.children):
+            tree.children.remove(node)
 
         # given node is no direct child node of tree
         else:
             new_children = []
 
+            removed_node = False
             for child in tree.children:
-                if(isinstance(child, Token)):
+                if(removed_node or isinstance(child, Token) or not contains_child_node(child, node)):
                     new_children.append(child)
                 else:
-                    new_children.append(remove_node_helper(child, node, occurrence_in_child_list))
+                    new_children.append(remove_node_helper(child, node))
+                    removed_node = True
 
             tree.set(tree.data, new_children)
 
         return tree
 
-    return remove_node_helper(copy.deepcopy(tree), node, occurrence_in_child_list)
+    return remove_node_helper(copy.deepcopy(tree), node)
 
 def contains_child_node(tree: ParseTree | Token, node: ParseTree | Token) -> bool:
     """

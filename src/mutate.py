@@ -8,8 +8,6 @@ import lark.reconstruct
 import csv
 # import random
 
-# studs
-
 def check_syntax(ta: str) -> bool:
     """
     Checks whether given TA has correct TChecker syntax.

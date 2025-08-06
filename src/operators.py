@@ -450,6 +450,21 @@ def add_transition(tree: ParseTree) -> list[ParseTree]:
 
     mutations = []
 
+    # find fresh event id non-existent in original TA
+    dummy_event_id = Tree(Token('RULE', 'id'), [Token('__ANON_0', 'dummy')])
+    for i in range(sys.maxsize):
+        if(not AST_tools.contains_child_node(tree, dummy_event_id)):
+            break
+        dummy_event_id = Tree(Token('RULE', 'id'), [Token('__ANON_0', f'dummy_{i}')])
+
+    # add dummy event declaration to tree
+    tree_with_dummy_event = copy.deepcopy(tree)
+    dummy_idx = tree_with_dummy_event.children.index(next(tree.find_data("event_declaration")))
+    dummy_event = Tree(Token('RULE', 'event_declaration'), 
+                       [Token('EVENT_TOK', 'event'), Token('COLON_TOK', ':'), dummy_event_id])
+    tree_with_dummy_event.children.insert(dummy_idx, Token('NEWLINE_TOK', '\n'))
+    tree_with_dummy_event.children.insert(dummy_idx, dummy_event)
+
     for process in tree.find_data("process_declaration"):
 
         process_id = process.children[2]
@@ -463,17 +478,18 @@ def add_transition(tree: ParseTree) -> list[ParseTree]:
                 # find transition to be cloned (first transition)
                 new_edge = copy.deepcopy(next(tree.find_data("edge_declaration")))
                 
-                # exchange source and target location
+                # exchange source and target location as well as event
                 new_edge.children[2] = process_id
                 new_edge.children[4] = source_location
                 new_edge.children[6] = target_location
+                new_edge.children[8] = dummy_event_id
 
-                # skip this mutation if new edge is identical to cloned edge
-                if(new_edge == next(tree.find_data("edge_declaration"))):
+                # skip this mutation if there already is a transition with same source and target location
+                if(0 < len([edge for edge in tree.find_data("edge_declaration") if edge.children[2] == process_id and edge.children[4] == source_location and edge.children[6] == target_location])):
                     continue
 
                 # add transition    
-                mutation = copy.deepcopy(tree)
+                mutation = copy.deepcopy(tree_with_dummy_event)
                 mutation.children.append(Token('NEWLINE_TOK', '\n\n'))
                 mutation.children.append(new_edge)
 
@@ -497,17 +513,16 @@ def change_transition_source_or_target(tree: ParseTree, change_source: bool) -> 
         process_id = edge.children[2]
         source_location_id = edge.children[4]
         target_location_id = edge.children[6]
-        old_location = source_location_id if change_source else target_location_id
-
-        occurrence = 2 if not change_source and source_location_id == target_location_id else 1
 
         # find new source or target location
         new_location_options = [location.children[4] for location in tree.find_data("location_declaration") if location.children[2] == process_id]
-        new_location_options.remove(old_location)
+        new_location_options.remove(source_location_id if change_source else target_location_id)
             
         for location in new_location_options:
             # change transition
-            altered_edge = AST_tools.exchange_node(edge, old_location, location, occurrence)
+            altered_edge = copy.deepcopy(edge)
+            old_location_idx = 4 if change_source else 6
+            altered_edge.children[old_location_idx] = location
             mutations.append(AST_tools.exchange_node(tree, edge, altered_edge))
 
     return mutations
