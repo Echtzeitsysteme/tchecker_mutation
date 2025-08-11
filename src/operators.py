@@ -6,16 +6,6 @@ import copy
 
 from lark import ParseTree, Token, Tree
 
-def no_op(tree: ParseTree) -> list[ParseTree]:
-    """
-    For testing purposes.
-    """
-    print(tree.pretty())
-    print(tree)
-    return [transformers.combineGuards().transform(tree)]
-
-# attribute changing operators
-
 # cmp definitions
 cmps = ["==", "<=", "<", ">=", ">"]
 cmp_tokens = {
@@ -25,6 +15,8 @@ cmp_tokens = {
             ">=": Token("CMP_GEQ_TOK", ">="),
             ">": Token("CMP_GT_TOK", ">")
             }
+
+# attribute changing operators
 
 def change_event(tree: ParseTree) -> list[ParseTree]:
     """

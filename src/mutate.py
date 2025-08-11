@@ -52,9 +52,6 @@ def apply_mutation(ta_tree: lark.ParseTree, op: str, value: int) -> list[lark.Pa
 
     # mutating AST
     match op:
-        case "no_op":
-            # for testing purposes
-            return operators.no_op(ta_tree)
         case "change_event":
             return operators.change_event(ta_tree)
         case "change_constraint_cmp":
@@ -102,8 +99,7 @@ def apply_mutation(ta_tree: lark.ParseTree, op: str, value: int) -> list[lark.Pa
 
 if "__main__" == __name__:
 
-    op_choices = ["no_op", 
-                  "all",
+    op_choices = ["all",
                   "change_event",
                   "change_constraint_cmp", 
                   "change_constraint_clock", 
@@ -226,7 +222,6 @@ if "__main__" == __name__:
     # compute mutations
     if (op == "all"):
         ops = op_choices.copy()
-        ops.remove("no_op")
         ops.remove("all")
 
         for operator in ops:
