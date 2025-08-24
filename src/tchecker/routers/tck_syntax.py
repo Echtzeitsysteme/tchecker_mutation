@@ -2,7 +2,7 @@ import tempfile
 import os
 from fastapi import APIRouter, Body, HTTPException
 from pydantic import BaseModel
-import util.call_tchecker as call_tchecker
+import tchecker.util.call_tchecker as call_tchecker
 
 router = APIRouter(prefix="/tck_syntax", tags=["tck_syntax"])
 
@@ -16,7 +16,7 @@ def check(body: str = Body(...)):
         temp_file.write(body.encode('utf-8'))
         temp_file_path = temp_file.name
         
-    print(temp_file_path)
+    # print(temp_file_path)
 
 
 

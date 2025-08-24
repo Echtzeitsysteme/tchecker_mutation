@@ -1,11 +1,9 @@
-import ctypes
 import tempfile
 import os
 from typing import Optional
 from fastapi import APIRouter, Body
 from pydantic import BaseModel
-import util.call_tchecker as call_tchecker
-import asyncio
+import tchecker.util.call_tchecker as call_tchecker
 
 router = APIRouter(prefix="/tck_compare", tags=["tck_compare"])
 
@@ -46,6 +44,6 @@ async def compare(body: TckCompareBody = Body(...)):
     resultMap = {
         "stats": output,
     }
-    print("Output: " + output)
+    # print("Output: " + output)
     
     return resultMap

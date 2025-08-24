@@ -2,8 +2,6 @@
 import ctypes
 import json
 import argparse
-import ast
-import sys
 
 def main():
     parser = argparse.ArgumentParser(

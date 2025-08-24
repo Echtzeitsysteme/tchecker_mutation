@@ -1,45 +1,61 @@
 import operators
 import transformers
+from tchecker.routers import tck_compare, tck_reach, tck_syntax
 
 import argparse
 import os.path
 import lark
 import lark.reconstruct
 import csv
-# import random
+import asyncio
 
 def check_syntax(ta: str) -> bool:
     """
     Checks whether given TA has correct TChecker syntax.
-    Not implemented yet.
 
-    :param ta: .txt or .tck file of TA.
-    :return: True iff given file has valid syntax.
+    :param ta: system declaration of TA as string
+    :return: True iff given declaration has valid syntax
     """ 
-    return True
+    try:
+        return tck_syntax.check(ta)["status"] == "success"
+    except:
+        return False
 
 def check_reachability(ta: str) -> bool:
     """
     Checks reachability of the given TA.
-    Not implemented yet.
 
-    :param ta: .txt or .tck file of TA.
-    :return: True iff reachability check was successful.
-    :raises Error: if TA file is semantically faulty
+    :param ta: system declaration of TA as string
+    :return: True iff reachability check was successful
+    :raises ValueError: if TA file is semantically faulty
     """ 
-    return True
+    body = tck_reach.TckReachBody(
+        sysdecl=ta, 
+        labels="", 
+        algorithm=0,
+        search_order="bfs",
+        certificate=0
+    )
+    result = asyncio.run(tck_reach.reach(body))["stats"]
+    if(result == ""):
+        raise ValueError("TA declaration is semantically faulty.")
+    return "REACHABLE true" in result
 
 def check_bisimilarity(first: str, second: str) -> bool:
     """
     Checks whether given TA are bisimilar.
-    Not implemented yet.
 
-    :param first: .txt or .tck file of first TA
-    :param second: .txt or .tck file of second TA
+    :param first: system declaration of first TA as string
+    :param second: system declaration of second TA as string
     :return: true iff given TA are bisimilar
     """ 
-    # return random.choice([True, False])
-    return False
+    body = tck_compare.TckCompareBody(
+        first_sysdecl=first, 
+        second_sysdecl=second, 
+        relationship=0
+    )
+    result = asyncio.run(tck_compare.compare(body))["stats"]
+    return "RELATIONSHIP_FULFILLED true" in result
 
 def apply_mutation(ta_tree: lark.ParseTree, op: str, value: int) -> list[lark.ParseTree]:
     """
@@ -152,7 +168,7 @@ if "__main__" == __name__:
     )
 
     args = parser.parse_args()
-    in_ta = args.in_ta
+    in_file = args.in_ta
     out_dir = args.out_dir
     op = args.op
 
@@ -164,6 +180,9 @@ if "__main__" == __name__:
         value = 1
 
     os.makedirs(out_dir, exist_ok=True)
+    
+    with open(in_file) as file:
+        in_ta = file.read()
 
     # assert that input TA file does not contain syntax errors
     assert(check_syntax(in_ta))
@@ -171,8 +190,7 @@ if "__main__" == __name__:
     # parsing input TA text file to AST
     ta_parser = lark.Lark.open("parsing/grammar.lark", __file__)
     ta_parser.options.maybe_placeholders = False
-    with open(in_ta) as file:
-        in_ta_tree = ta_parser.parse(file.read())
+    in_ta_tree = ta_parser.parse(in_ta)
 
     # simplifying complex expressions in AST
     in_ta_tree = transformers.SimplifyExpressions().transform(in_ta_tree)
@@ -188,9 +206,14 @@ if "__main__" == __name__:
     csv_writer.writerow(["mutation", "result of bisimilarity check"])
 
     def write_mutations(mutations: list[lark.ParseTree], op: str) -> None:
-        for i, mutation in enumerate(mutations):
 
-            file_name = f"{in_ta[:-4]}_mutation_{op}_{i}.tck"
+        original_file_name = os.path.basename(in_file)[:-4]
+
+        i = 0
+        for mutation in mutations:
+              
+            file_name = f"{original_file_name}_mutation_{op}_{i}.tck"
+            i = i + 1
             out_file = os.path.join(out_dir, file_name)
 
             # reconstructing TA text file from mutated AST
@@ -201,16 +224,17 @@ if "__main__" == __name__:
                 file.write(out_ta)
 
             # assert that output TA file does not contain syntax errors
-            assert(check_syntax(out_file))
+            assert(check_syntax(out_ta))
 
             # delete mutation if it is semantically faulty
             try:
-                check_reachability(out_file)
+                check_reachability(out_ta)
             except:
                 os.remove(out_file)
+                i = i - 1
 
             # check whether mutation is bisimilar to original
-            is_bisimilar_to_original = check_bisimilarity(in_ta, out_file)
+            is_bisimilar_to_original = check_bisimilarity(in_ta, out_ta)
 
             # log bisimilarity of mutation
             csv_writer.writerow([file_name, is_bisimilar_to_original])
