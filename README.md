@@ -52,22 +52,36 @@ Default is 1.
 
 ## Prerequisites
 
-To use **TChecker Mutation**, the following software is required:
+Before using **TChecker Mutation**, install the required dependencies:
 
-- [lark](https://github.com/lark-parser/lark)
-- [TChecker](https://github.com/Echtzeitsysteme/tchecker/)
+```bash
+pip install -r requirements.txt 
+```
+
+You will also need to build the TChecker shared library.
+Follow the instructions in the [TChecker documentation](https://github.com/ticktac-project/tchecker/wiki/Installation-of-TChecker) to build the library and set the `LIBTCHECKER_ENABLE_SHARED` option to `ON` during the CMake configuration step:
+
+```bash
+cmake ../tchecker -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/path/to/install -DLIBTCHECKER_ENABLE_SHARED=ON
+```
+
+Now copy the TChecker shared library binary to the `tchecker` directory of the project:
+
+```bash
+cp path_to_tchecker_installation/lib/libtchecker.so ./tchecker/libtchecker.so
+```
 
 ## Usage
 
 To generate mutations, run the following command:
 
-```
-$ python mutate.py --in_ta <input_tchecker_file> --out_dir <output_directory> --op <operator> [--val <int>]
+```bash
+python mutate.py --in_ta <input_tchecker_file> --out_dir <output_directory> --op <operator> [--val <int>]
 ```
 
 For example:
-```
-$ python mutate.py --in_ta ad94.tck --out_dir out --op remove_location
+```bash
+python mutate.py --in_ta ad94.tck --out_dir out --op remove_location
 ```
 
 The input file must be a .txt or .tck file in valid [TChecker syntax](https://github.com/ticktac-project/tchecker/wiki/TChecker-file-format).  
@@ -76,11 +90,6 @@ Mutations that are bisimilar to the original network are written to a seperate d
 Whether a mutation is bisimilar or not is logged in `bisimilarity_log.csv` in `bisimilar_mutations`.
 
 Note: Output mutation files do not preserve comments of the original TChecker file.
-
-## Future Work
-
-TChecker is not integrated into **TChecker Mutation** yet.
-So far, **TChecker Mutation** does not check for bisimilarity by itself and treats all generated mutants as semantically correct and not bisimilar to the original network.
 
 ## Literature
 
