@@ -637,19 +637,21 @@ def add_sync_constraint(tree: ParseTree) -> list[ParseTree]:
     :param tree: AST of TA to be mutated
     :return: list of mutated ASTs
     """
+    
+    # move all sync declarations to the end of system declaration to avoid references to undeclared processes or events
+    transformed_tree = transformers.MoveSyncsToEnd().transform(tree)
 
     mutations = []
 
     # find every possible sync_constraint
     sync_constraints = []
-    for process in [process.children[2] for process in tree.find_data("process_declaration")]:
-        for event in [event.children[2] for event in tree.find_data("event_declaration")]:
+    for process in [process.children[2] for process in transformed_tree.find_data("process_declaration")]:
+        for event in [event.children[2] for event in transformed_tree.find_data("event_declaration")]:
             new_sync_constraint = Tree(Token('RULE', 'sync_constraint'), 
                                        [process, Token('AT_TOK', '@'), event])
             sync_constraints.append(new_sync_constraint)
 
-    for sync in tree.find_data("sync_declaration"):
-
+    for sync in transformed_tree.find_data("sync_declaration"):
         for sync_constraint in sync_constraints:
 
             # skip sync constraint if its process is already appearing in sycnhronisation
@@ -661,7 +663,7 @@ def add_sync_constraint(tree: ParseTree) -> list[ParseTree]:
             new_sync.children[2].children.append(Token('COLON_TOK', ':'))
             new_sync.children[2].children.append(sync_constraint)
 
-            mutations.append(AST_tools.exchange_node(tree, sync, new_sync))
+            mutations.append(AST_tools.exchange_node(transformed_tree, sync, new_sync))
 
     return mutations
 

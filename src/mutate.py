@@ -210,7 +210,7 @@ if "__main__" == __name__:
             # assert that output TA file does not contain syntax errors
             assert(check_syntax(out_ta))
 
-            # delete mutation if it is semantically faulty
+            # delete mutation if it is semantically faulty (i.e. there is an out-of-bounds array access/value)
             try:
                 check_reachability(out_ta)
             except:

@@ -100,7 +100,7 @@ class BreakUpEquals(Transformer):
 
         return result
 
-class combineGuards(Transformer):
+class CombineGuards(Transformer):
     """
     Combines multiple guards of one transition into one by conjuction (in case one edge has more than one provided attribute).
     """
@@ -129,4 +129,22 @@ class combineGuards(Transformer):
             # remove guard
             result.children[9].children.pop(idx - 1)
 
-        return AST_tools.exchange_node(result, old_guard, new_guard) 
+        return AST_tools.exchange_node(result, old_guard, new_guard)
+    
+class MoveSyncsToEnd(Transformer):
+    """
+    Moves all sync declarations to the end of the system declaration.
+    """
+
+    @lark.visitors.v_args(tree=True)
+    def start(self, tree: ParseTree) -> ParseTree:
+
+        result = copy.deepcopy(tree)
+
+        for child in tree.children:
+            if isinstance(child, Tree) and child.data == "sync_declaration":
+                result.children.remove(child)
+                result.children.append(Token('NEWLINE_TOK', '\n'))
+                result.children.append(child)
+        
+        return result
