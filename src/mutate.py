@@ -1,13 +1,12 @@
 import operators
 import transformers
-from tchecker.routers import tck_compare, tck_reach, tck_syntax
+from tcheckerpy.tools import tck_compare, tck_reach, tck_syntax
 
 import argparse
 import os.path
 import lark
 import lark.reconstruct
 import csv
-import asyncio
 
 def check_syntax(ta: str) -> bool:
     """
@@ -17,7 +16,8 @@ def check_syntax(ta: str) -> bool:
     :return: True iff given declaration has valid syntax
     """ 
     try:
-        return tck_syntax.check(ta)["status"] == "success"
+        tck_syntax.check(ta)
+        return True
     except:
         return False
 
@@ -27,19 +27,9 @@ def check_reachability(ta: str) -> bool:
 
     :param ta: system declaration of TA as string
     :return: True iff reachability check was successful
-    :raises ValueError: if TA file is semantically faulty
+    :raises Error: if TA file is semantically faulty
     """ 
-    body = tck_reach.TckReachBody(
-        sysdecl=ta, 
-        labels="", 
-        algorithm=0,
-        search_order="bfs",
-        certificate=0
-    )
-    result = asyncio.run(tck_reach.reach(body))["stats"]
-    if(result == ""):
-        raise ValueError("TA declaration is semantically faulty.")
-    return "REACHABLE true" in result
+    return tck_reach.reach(ta, tck_reach.Algorithm.REACH)[0]
 
 def check_bisimilarity(first: str, second: str) -> bool:
     """
@@ -49,13 +39,7 @@ def check_bisimilarity(first: str, second: str) -> bool:
     :param second: system declaration of second TA as string
     :return: true iff given TA are bisimilar
     """ 
-    body = tck_compare.TckCompareBody(
-        first_sysdecl=first, 
-        second_sysdecl=second, 
-        relationship=0
-    )
-    result = asyncio.run(tck_compare.compare(body))["stats"]
-    return "RELATIONSHIP_FULFILLED true" in result
+    return tck_compare.compare(first, second)[0]
 
 def apply_mutation(ta_tree: lark.ParseTree, op: str, value: int) -> list[lark.ParseTree]:
     """
@@ -232,6 +216,7 @@ if "__main__" == __name__:
             except:
                 os.remove(out_file)
                 i = i - 1
+                continue
 
             # check whether mutation is bisimilar to original
             is_bisimilar_to_original = check_bisimilarity(in_ta, out_ta)

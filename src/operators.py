@@ -308,7 +308,7 @@ def negate_guard(tree: ParseTree) -> list[ParseTree]:
     # transform equals comparator before negation since neq comparator is not allowed in clock expressions
     transformed_tree = transformers.BreakUpEquals().transform(tree)
     # combine multiple guards of one transition into one guard
-    transformed_tree = transformers.combineGuards().transform(transformed_tree)
+    transformed_tree = transformers.CombineGuards().transform(transformed_tree)
 
     mutations = []
 

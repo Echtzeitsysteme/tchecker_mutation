@@ -58,19 +58,6 @@ Before using **TChecker Mutation**, install the required dependencies:
 pip install -r requirements.txt 
 ```
 
-You will also need to build the TChecker shared library.
-Follow the instructions in the [TChecker documentation](https://github.com/ticktac-project/tchecker/wiki/Installation-of-TChecker) to build the library and set the `LIBTCHECKER_ENABLE_SHARED` option to `ON` during the CMake configuration step:
-
-```bash
-cmake ../tchecker -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/path/to/install -DLIBTCHECKER_ENABLE_SHARED=ON
-```
-
-Now copy the TChecker shared library binary to the `tchecker` directory of the project:
-
-```bash
-cp path_to_tchecker_installation/lib/libtchecker.so ./tchecker/libtchecker.so
-```
-
 ## Usage
 
 To generate mutations, run the following command:
