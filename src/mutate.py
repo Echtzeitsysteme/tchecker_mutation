@@ -8,49 +8,16 @@ import lark
 import lark.reconstruct
 import csv
 
-def check_syntax(ta: str) -> bool:
-    """
-    Checks whether given TA has correct TChecker syntax.
-
-    :param ta: system declaration of TA as string
-    :return: True iff given declaration has valid syntax
-    """ 
-    try:
-        tck_syntax.check(ta)
-        return True
-    except:
-        return False
-
-def check_reachability(ta: str) -> bool:
-    """
-    Checks reachability of the given TA.
-
-    :param ta: system declaration of TA as string
-    :return: True iff reachability check was successful
-    :raises Error: if TA file is semantically faulty
-    """ 
-    return tck_reach.reach(ta, tck_reach.Algorithm.REACH)[0]
-
-def check_bisimilarity(first: str, second: str) -> bool:
-    """
-    Checks whether given TA are bisimilar.
-
-    :param first: system declaration of first TA as string
-    :param second: system declaration of second TA as string
-    :return: true iff given TA are bisimilar
-    """ 
-    return tck_compare.compare(first, second)[0]
-
 def apply_mutation(ta_tree: lark.ParseTree, op: str, value: int) -> list[lark.ParseTree]:
     """
     Applies mutation operator to given TA.
 
     :param ta_tree: AST of TA to be mutated
     :param op: mutation operator to be used
-    :return: list of mutations
+    :return: list of mutations as AST
     """ 
 
-    # mutating AST
+    # mutate AST
     match op:
         case "change_event":
             return operators.change_event(ta_tree)
@@ -169,14 +136,14 @@ if "__main__" == __name__:
         in_ta = file.read()
 
     # assert that input TA file does not contain syntax errors
-    assert(check_syntax(in_ta))
+    tck_syntax.check(in_ta)
 
-    # parsing input TA text file to AST
+    # parse input TA text file to AST
     ta_parser = lark.Lark.open("parsing/grammar.lark", __file__)
     ta_parser.options.maybe_placeholders = False
     in_ta_tree = ta_parser.parse(in_ta)
 
-    # simplifying complex expressions in AST
+    # simplify complex expressions in AST
     in_ta_tree = transformers.SimplifyExpressions().transform(in_ta_tree)
 
     # create folder for bisimilar mutations
@@ -200,7 +167,7 @@ if "__main__" == __name__:
             i = i + 1
             out_file = os.path.join(out_dir, file_name)
 
-            # reconstructing TA text file from mutated AST
+            # reconstruct TA text file from mutated AST
             reconstructor = lark.reconstruct.Reconstructor(ta_parser)
             out_ta = reconstructor.reconstruct(mutation)
             
@@ -208,18 +175,18 @@ if "__main__" == __name__:
                 file.write(out_ta)
 
             # assert that output TA file does not contain syntax errors
-            assert(check_syntax(out_ta))
+            tck_syntax.check(out_ta)
 
             # delete mutation if it is semantically faulty (i.e. there is an out-of-bounds array access/value)
             try:
-                check_reachability(out_ta)
+                tck_reach.reach(out_ta, tck_reach.Algorithm.REACH)
             except:
                 os.remove(out_file)
                 i = i - 1
                 continue
 
             # check whether mutation is bisimilar to original
-            is_bisimilar_to_original = check_bisimilarity(in_ta, out_ta)
+            is_bisimilar_to_original, _, _ = tck_compare.compare(in_ta, out_ta)
 
             # log bisimilarity of mutation
             csv_writer.writerow([file_name, is_bisimilar_to_original])
